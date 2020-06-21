@@ -13,6 +13,8 @@
 unit _J_LoadScreenGenerator;
 
 const
+	version = '1.2.0';
+
 	modName = 'JLoadScreens.esp';
 	scriptName = 'JLoadScreens';
 	settingsName = 'Settings.txt';
@@ -886,7 +888,7 @@ begin
 	InitSettingKeys();
 	
 	Log('	');
-	Log('	JLoadScreenGenerator runs.');
+	Log('	Running JLoadScreenGenerator ' + version);
 	UI();
 end;
 
