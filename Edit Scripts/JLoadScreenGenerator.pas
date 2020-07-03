@@ -320,21 +320,31 @@ end;
 	Create meshes based on a template.
 	Set texture and vertex positions according to image and screen resolution.
 }
-procedure CreateMeshes(targetPath : string; templateNif : TwbNifFile; stretch : Boolean);
+procedure CreateMeshes(targetPath : string; templateNif : TwbNifFile; stretch, sse : Boolean);
 var
 	i, j, vertices : integer;
 	Textures, VertexData: TdfElement;
 	TextureSet, TriShape: TwbNifBlock;
+	VertexPrefix : String;
 begin
 	for i:=0 to Pred(imagePathArray.Count()) do begin
-		TextureSet := templateNif.Blocks[3];
+		if sse then TextureSet := templateNif.Blocks[3] else TextureSet := templateNif.Blocks[4];
 		Textures := TextureSet.Elements['Textures'];
 		Textures[0].EditValue := 'textures\JLoadScreens\' + imagePathArray[i] + '.dds';
 
 		FitToDisplayRatio(displayRatio, strtofloat(imageWidthArray[i])/strtofloat(imageHeightArray[i]), stretch);
-		TriShape := templateNif.Blocks[1];
-		vertices := TriShape.NativeValues['Num Vertices'];
-		VertexData := TriShape.Elements['Vertex Data'];
+		if sse then begin
+			TriShape := templateNif.Blocks[1];
+			vertices := TriShape.NativeValues['Num Vertices'];
+			VertexData := TriShape.Elements['Vertex Data'];
+			VertexPrefix := '';
+		end else begin
+			TriShape := templateNif.Blocks[2];
+			vertices := TriShape.NativeValues['Num Vertices'];
+			VertexData := TriShape.Elements['Vertices'];
+			VertexPrefix = 'Vertex\';
+		end
+		
 
 		{Log('widthFactor='+floattostr(widthFactor));
 		Log('heightFactor='+floattostr(heightFactor));
@@ -345,20 +355,20 @@ begin
 		Log('sourceOffsetY='+floattostr(sourceOffsetY));}
 
 		// Top Left
-		VertexData[0].NativeValues['Vertex\X'] := sourceOffsetX - sourceUpperWidth * widthFactor;
-		VertexData[0].NativeValues['Vertex\Y'] := sourceOffsetY + sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
+		VertexData[0].NativeValues[VertexPrefix + 'X'] := sourceOffsetX - sourceUpperWidth * widthFactor;
+		VertexData[0].NativeValues[VertexPrefix + 'Y'] := sourceOffsetY + sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
 
 		// Bottom Left
-		VertexData[1].NativeValues['Vertex\X'] := sourceOffsetX - sourceUpperWidth * widthFactor - sourceLowerWidth * widthFactor * heightFactor;
-		VertexData[1].NativeValues['Vertex\Y'] := sourceOffsetY - sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
+		VertexData[1].NativeValues[VertexPrefix + 'X'] := sourceOffsetX - sourceUpperWidth * widthFactor - sourceLowerWidth * widthFactor * heightFactor;
+		VertexData[1].NativeValues[VertexPrefix + 'Y'] := sourceOffsetY - sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
 
 		// Bottom Right
-		VertexData[2].NativeValues['Vertex\X'] := sourceOffsetX + sourceUpperWidth * widthFactor + sourceLowerWidth * widthFactor * heightFactor;
-		VertexData[2].NativeValues['Vertex\Y'] := sourceOffsetY - sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
+		VertexData[2].NativeValues[VertexPrefix + 'X'] := sourceOffsetX + sourceUpperWidth * widthFactor + sourceLowerWidth * widthFactor * heightFactor;
+		VertexData[2].NativeValues[VertexPrefix + 'Y'] := sourceOffsetY - sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
 
 		// Top Right
-		VertexData[3].NativeValues['Vertex\X'] := sourceOffsetX + sourceUpperWidth * widthFactor;
-		VertexData[3].NativeValues['Vertex\Y'] := sourceOffsetY + sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
+		VertexData[3].NativeValues[VertexPrefix + 'X'] := sourceOffsetX + sourceUpperWidth * widthFactor;
+		VertexData[3].NativeValues[VertexPrefix + 'Y'] := sourceOffsetY + sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
 
 		templateNif.SaveToFile(targetPath + imagePathArray[i] + '.nif');
 	end;
@@ -548,13 +558,17 @@ begin
 	// Load template mesh
 	templateNif := TwbNifFile.Create;
 	try
-		templateNif.LoadFromFile(templatePath + '\Template.nif');
+		if wbAppName = 'SSE' then begin
+			templateNif.LoadFromFile(templatePath + '\TemplateSSE.nif');
+		end else begin
+			templateNif.LoadFromFile(templatePath + '\TemplateLE.nif');
+		end
 	except
 		Log('Error: Something went wrong when trying to load the template mesh.');
 	end;
 
 	// Create .nif files in mesh path
-	CreateMeshes(meshPath, templateNif, ReadSettingBool(skStretch));
+	CreateMeshes(meshPath, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE');
 
 	// Create .esp
 	CreateESP(modName, disableOthers);
