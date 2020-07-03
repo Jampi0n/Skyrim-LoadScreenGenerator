@@ -40,7 +40,7 @@ var
 
 	gamma, blackPoint, whitePoint, brightness, saturation : Real;
 
-	imagePathArray,	imageWidthArray, imageHeightArray : TStringList;
+	imagePathArray,	imageWidthArray, imageHeightArray, imageTextArray : TStringList;
 
 	error : Boolean;
 
@@ -271,6 +271,8 @@ begin
 		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', 100);
 		SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetRandomPercent');
 
+		SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
+
 	end;
 	if disableOthers then begin
 		PatchLoadingScreens(esp);
@@ -342,7 +344,7 @@ begin
 			TriShape := templateNif.Blocks[2];
 			vertices := TriShape.NativeValues['Num Vertices'];
 			VertexData := TriShape.Elements['Vertices'];
-			VertexPrefix = 'Vertex\';
+			VertexPrefix := 'Vertex\';
 		end
 		
 
@@ -412,9 +414,9 @@ procedure ProcessTextures(sourcePath, targetPath: string; recursive : Boolean);
 var
 	TDirectory: TDirectory;
 	sourceFiles: TStringDynArray;
-	sourcePathList, texturePathList, readDiagOutput, ignoredFiles : TStringList;
+	sourcePathList, texturePathList, readTextFile, ignoredFiles : TStringList;
 	i, j, imageCount, tmp: integer;
-	cmd, s: string;
+	cmd, s, textFile: string;
 	Nif: TwbNifFile;
 begin
 
@@ -433,6 +435,7 @@ begin
 	imagePathArray := TStringList.Create;
 	imageWidthArray := TStringList.Create;
 	imageHeightArray := TStringList.Create;
+	imageTextArray := TStringList.Create;
 
 	// This list is used to ensure files with the same base name are only used once.
 	texturePathList := TStringList.Create;
@@ -491,15 +494,24 @@ begin
 				cmd := '/C  ""' + editScriptsSubFolder  + '\DirectXTex\texdiag.exe" info "' + sourcePathList[i] + '" -nologo >"' + editScriptsSubFolder + '\texdiag.txt""';
 				ShellExecuteWait(0, nil, 'cmd.exe', cmd, '', SW_HIDE);
 				// Read output from %subfolder%\texdiag.txt
-				readDiagOutput := TStringList.Create();
-				readDiagOutput.LoadFromFile(editScriptsSubFolder + '\texdiag.txt');
+				readTextFile := TStringList.Create();
+				readTextFile.LoadFromFile(editScriptsSubFolder + '\texdiag.txt');
 
-				if readDiagOutput.Count <=0 then raise exception.Create('texdiag.txt is empty.');
-				if ContainsText(readDiagOutput[0], 'FAILED') then raise exception.Create('texdiag.exe failed to analyze the texture.');
+				if readTextFile.Count <=0 then raise exception.Create('texdiag.txt is empty.');
+				if ContainsText(readTextFile[0], 'FAILED') then raise exception.Create('texdiag.exe failed to analyze the texture.');
 
 				imagePathArray.Add(s);
-				imageWidthArray.Add(inttostr(ParseTexDiagOutput(readDiagOutput[1])));
-				imageHeightArray.Add(inttostr(ParseTexDiagOutput(readDiagOutput[2])));
+				imageWidthArray.Add(inttostr(ParseTexDiagOutput(readTextFile[1])));
+				imageHeightArray.Add(inttostr(ParseTexDiagOutput(readTextFile[2])));
+				textFile := ChangeFileExt(sourcePathList[i],'.txt');
+				if FileExists(textFile) then begin
+					readTextFile := TStringList.Create();
+					readTextFile.LoadFromFile(textFile);
+					if readTextFile.Count <=0 then raise exception.Create(s + '.txt is empty.');
+					imageTextArray.Add(readTextFile[0]);
+				end else begin
+					imageTextArray.Add('');
+				end;
 			except
 				on E : Exception do begin
 					Log('	');
@@ -562,7 +574,7 @@ begin
 			templateNif.LoadFromFile(templatePath + '\TemplateSSE.nif');
 		end else begin
 			templateNif.LoadFromFile(templatePath + '\TemplateLE.nif');
-		end
+		end;
 	except
 		Log('Error: Something went wrong when trying to load the template mesh.');
 	end;
