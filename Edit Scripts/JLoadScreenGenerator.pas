@@ -339,12 +339,12 @@ begin
 			TriShape := templateNif.Blocks[1];
 			vertices := TriShape.NativeValues['Num Vertices'];
 			VertexData := TriShape.Elements['Vertex Data'];
-			VertexPrefix := '';
+			VertexPrefix := 'Vertex\';
 		end else begin
 			TriShape := templateNif.Blocks[2];
 			vertices := TriShape.NativeValues['Num Vertices'];
 			VertexData := TriShape.Elements['Vertices'];
-			VertexPrefix := 'Vertex\';
+			VertexPrefix := '';
 		end
 		
 
