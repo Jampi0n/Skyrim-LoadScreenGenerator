@@ -399,9 +399,9 @@ end;
 	Read integer from the texdiag output file.
 	The output starts at position 17.
 }
-function ParseTexDiagOutput(output : String) : Integer;
+function ParseTexDiagOutput(output : String) : String;
 begin
-	Result := strtoint(Copy(output, 17, length(output)));
+	Result := Copy(output, 17, length(output));
 end;
 
 {
@@ -416,8 +416,9 @@ var
 	sourceFiles: TStringDynArray;
 	sourcePathList, texturePathList, readTextFile, ignoredFiles : TStringList;
 	i, j, imageCount, tmp: integer;
-	cmd, s, textFile: string;
+	cmd, s, textFile, srgbCmd : string;
 	Nif: TwbNifFile;
+	srgb : Boolean;
 begin
 
 	sourcePathList := TStringList.Create;
@@ -453,9 +454,36 @@ begin
 		if not texturePathList.Find(s, tmp) then begin
 			texturePathList.Add(s);
 
+			srgb := false;
+			srgbCmd := '';
+
+			// use texdiag to read input format
+			try
+				cmd := '/C  ""' + editScriptsSubFolder  + '\DirectXTex\texdiag.exe" info "' + sourcePathList[i] + '" -nologo >"' + editScriptsSubFolder + '\texdiag.txt""';
+				ShellExecuteWait(0, nil, 'cmd.exe', cmd, '', SW_HIDE);
+				// Read output from %subfolder%\texdiag.txt
+				readTextFile := TStringList.Create();
+				readTextFile.LoadFromFile(editScriptsSubFolder + '\texdiag.txt');
+
+				if readTextFile.Count <=0 then raise exception.Create('texdiag.txt is empty.');
+				if ContainsText(readTextFile[0], 'FAILED') then raise exception.Create('texdiag.exe failed to analyze the texture.');
+
+				if ContainsText(ParseTexDiagOutput(readTextFile[6]), 'SRGB') then begin
+					srgb := True;
+				end;
+			except
+				on E : Exception do begin
+      				Log(E.ClassName + ' error raised, with message : ' + E.Message);
+					Log('Error while using texdiag.exe for image ' + sourcePathList[i]);
+					continue;
+				end;
+			end;
+
+			if srgb then srgbCmd := '-srgb ';
+
 			try
 				// Execute texconv.exe (timeout = 10 seconds)
-				cmd := ' -m 1 -f BC1_UNORM -o "' + targetPath + '" -y -w 2048 -h 2048 "' + sourcePathList[i] + '"';
+				cmd := ' -m 1 -f BC1_UNORM ' + srgbCmd + '-o "' + targetPath + '" -y -w 2048 -h 2048 "' + sourcePathList[i] + '"';
 				CreateProcessWait(ScriptsPath + 'Texconv.exe', cmd, SW_HIDE, 10000);
 			except
 				on E : Exception do begin
@@ -501,8 +529,8 @@ begin
 				if ContainsText(readTextFile[0], 'FAILED') then raise exception.Create('texdiag.exe failed to analyze the texture.');
 
 				imagePathArray.Add(s);
-				imageWidthArray.Add(inttostr(ParseTexDiagOutput(readTextFile[1])));
-				imageHeightArray.Add(inttostr(ParseTexDiagOutput(readTextFile[2])));
+				imageWidthArray.Add(inttostr(strtoint(ParseTexDiagOutput(readTextFile[1]))));
+				imageHeightArray.Add(inttostr(strtoint(ParseTexDiagOutput(readTextFile[2]))));
 				textFile := ChangeFileExt(sourcePathList[i],'.txt');
 				if FileExists(textFile) then begin
 					readTextFile := TStringList.Create();
