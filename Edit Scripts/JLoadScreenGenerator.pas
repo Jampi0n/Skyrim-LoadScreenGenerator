@@ -36,7 +36,7 @@ var
 	heightFactor, widthFactor : Real;
 
 	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, sk4K : Integer;
-	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyList, skDefaultFrequency : Integer;
+	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skModLink, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyList, skDefaultFrequency : Integer;
 
 	gamma, blackPoint, whitePoint, brightness, saturation : Real;
 
@@ -588,6 +588,8 @@ begin
 				// Execute texconv.exe (timeout = 10 seconds)
 				cmd := ' -m 1 -f BC1_UNORM ' + srgbCmd + '-o "' + targetPath + '" -y -w 2048 -h 2048 "' + sourcePathList[i] + '"';
 				CreateProcessWait(ScriptsPath + 'Texconv.exe', cmd, SW_HIDE, 10000);
+				cmd := ' -f BC1_UNORM ' + '-o "' + targetPath + '" -y -w 2048 -h 2048 "' + targetPath + '\' + s + '.dds' + ' "';
+				CreateProcessWait(ScriptsPath + 'Texconv.exe', cmd, SW_HIDE, 10000);
 			except
 				on E : Exception do begin
       				Log(E.ClassName + ' error raised, with message : ' + E.Message);
@@ -872,9 +874,9 @@ end;
 
 function Advanced: Integer;
 var
-  	modNameLabel, modVersionLabel, modFolderLabel, modPluginLabel, modAuthorLabel, modPrefixLabel, messagesLabel, frequencyListLabel, frequencyDefaultLabel: TLabel;
+  	modNameLabel, modVersionLabel, modFolderLabel, modPluginLabel, modAuthorLabel, modPrefixLabel, modLinkLabel, messagesLabel, frequencyListLabel, frequencyDefaultLabel: TLabel;
 	screenResolutionBox, optionsBox, modBox : TGroupBox;
-	screenResolutionLine, modNameLine, modVersionLine, modFolderLine, modPluginLine, modAuthorLine, modPrefixLine, messagesLine, frequencyListLine, frequencyDefaultLine : TEdit;
+	screenResolutionLine, modNameLine, modVersionLine, modFolderLine, modPluginLine, modAuthorLine, modPrefixLine, modLinkLine, messagesLine, frequencyListLine, frequencyDefaultLine : TEdit;
 	btnOk, btnCancel: TButton;
 	tmpInt, modalResult : Integer;
 	tmpReal : Real;
@@ -889,7 +891,7 @@ begin
 		screenResolutionBox := AddBox(mainForm, 8, 8, mainForm.Width-24, 48, 'Aspect Ratios');
 		screenResolutionLine := AddLine(screenResolutionBox, 16, 16, mainForm.Width - 128, ReadSetting(skAspectRatios), 'Comma separated list of aspect ratios, e.g. "16x9,16x10,21x9"');
 
-		modBox := AddBox(screenResolutionBox, 0, screenResolutionBox.Height + 8, mainForm.Width-24, 176, 'Mod Configuration');
+		modBox := AddBox(screenResolutionBox, 0, screenResolutionBox.Height + 8, mainForm.Width-24, 192, 'Mod Configuration');
 
 		modNameLabel := AddLabel(modBox, 16, 24, 160, 24, 'Mod name');
 		modNameLine := AddLine(modNameLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModName), 'The display name of the mod. Will be used for the FOMOD installer.');
@@ -908,6 +910,10 @@ begin
 
 		modPrefixLabel := AddLabel(modPluginLabel, 0, 24, 160, 24, 'Prefix');
 		modPrefixLine := AddLine(modPrefixLabel, 80, -4, mainForm.Width - 128, ReadSetting(skPrefix), 'This prefix is added to all records.');
+
+		modLinkLabel := AddLabel(modPrefixLabel, 0, 24, 160, 24, 'Prefix');
+		modLinkLine := AddLine(modLinkLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModLink), 'Will be used for the FOMOD installer.');
+
 
 		optionsBox := AddBox(modBox, 0, modBox.Height + 8, mainForm.Width-24, 128, 'Options');
 
@@ -933,6 +939,7 @@ begin
 			WriteSetting(skModAuthor, modAuthorLine.Text);
 			WriteSetting(skPluginName, modPluginLine.Text);
 			WriteSetting(skPrefix, modPrefixLine.Text);
+			WriteSetting(skModLink, modLinkLine.Text);
 			WriteSetting(skMessages, messagesLine.Text);
 			WriteSetting(skFrequencyList, frequencyListLine.Text);
 			WriteSetting(skDefaultFrequency, frequencyDefaultLine.Text);
@@ -1158,6 +1165,8 @@ begin
 
 	skFrequencyList :=  GetSettingKey('5,10,15,25,35,50,70,100');
 	skDefaultFrequency := GetSettingKey('15');
+
+	skModLink := GetSettingKey('https://www.nexusmods.com/skyrimspecialedition/mods/36556');
 
 end;
 

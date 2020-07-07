@@ -72,7 +72,8 @@ class Fomod:
 
     def write_file(self):
         self.write_line(
-            '<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd"> ')
+            '<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+            'xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd"> ')
         self.indent()
         self.write_line('<moduleName>' + self.module_name + '</moduleName>')
 
@@ -127,7 +128,7 @@ class Fomod:
                 if option.default:
                     self.write_line('<typeDescriptor>')
                     self.indent()
-                    self.write_line('<typename="Recommended"/>')
+                    self.write_line('<type name="Recommended"/>')
                     self.unindent()
                     self.write_line('</typeDescriptor>')
 
@@ -187,6 +188,7 @@ class Settings:
         self.sk_messages = self.get_setting_key()
         self.sk_frequency_list = self.get_setting_key()
         self.sk_default_frequency = self.get_setting_key()
+        self.sk_mod_link = self.get_setting_key()
 
     def get_setting_key(self):
         self.setting_key += 1
@@ -220,7 +222,7 @@ def main():
     mod_version = settings[settings.sk_mod_version]
     mod_author = settings[settings.sk_mod_author]
     mod_desc = "description"
-    mod_link = "www.google.com"
+    mod_link = settings[settings.sk_mod_link]
 
     print(aspect_ratios)
     print(messages)
@@ -281,7 +283,8 @@ def main():
     if len(aspect_ratios) > 1:
         choose_aspect_ratio = InstallStep('Aspect Ratio')
         for aspect_ratio in aspect_ratios:
-            ratio_option = InstallOption(aspect_ratio, '')
+            ratio_option = InstallOption(aspect_ratio,
+                                         'Use this option, if you have an aspect ratio of ' + aspect_ratio + '.')
             ratio_option.add_folder(aspect_ratio, '')
             choose_aspect_ratio.add_option(ratio_option)
         fomod.add_install_step(choose_aspect_ratio)
@@ -290,9 +293,9 @@ def main():
 
     if messages == 'optional':
         choose_messages = InstallStep('Display Messages')
-        yes = InstallOption('Yes', '')
+        yes = InstallOption('Yes', 'Enables loading screen messages.')
         yes.add_flag('loading_screen_messages', 'true')
-        no = InstallOption('No', '')
+        no = InstallOption('No', 'Disables loading screen messages.')
         no.add_flag('loading_screen_messages', 'false')
         choose_messages.add_option(yes)
         choose_messages.add_option(no)
@@ -313,11 +316,15 @@ def main():
         choose_frequency_no = InstallStep('Loading Screen Frequency')
 
         for freq in frequencies:
-            freq_option_yes = InstallOption(str(freq) + '%', '')
+            desc = 'Controls how often the loading screens appear. With a frequency of 100%, ' \
+                   'loading screens from vanilla and vanilla compatible loading screen mods will no longer be used.'
+
+            freq_option_yes = InstallOption(str(freq) + '%', desc)
+
             freq_option_yes.add_folder(os.path.join('messages', 'p' + str(freq)), '')
             choose_frequency_yes.add_option(freq_option_yes)
 
-            freq_option_no = InstallOption(str(freq) + '%', '')
+            freq_option_no = InstallOption(str(freq) + '%', desc)
             freq_option_no.add_folder(os.path.join('no_messages', 'p' + str(freq)), '')
             choose_frequency_no.add_option(freq_option_no)
 
