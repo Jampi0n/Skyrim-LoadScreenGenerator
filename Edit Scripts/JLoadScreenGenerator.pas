@@ -34,15 +34,18 @@ var
 	editScriptsSubFolder : String;
 	messageLog, settings : TStringList;
 	settingKey : Integer;
-	displayRatio, heightFactor, widthFactor : Real;
+	heightFactor, widthFactor : Real;
 
-	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skGamma, skContrast, skBrightness, skSaturation : Integer;
+	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, sk4K : Integer;
+	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyOptions : Integer;
 
 	gamma, blackPoint, whitePoint, brightness, saturation : Real;
 
 	imagePathArray,	imageWidthArray, imageHeightArray, imageTextArray : TStringList;
 
 	error : Boolean;
+
+	mainForm: TForm;
 
 
 procedure ErrorMsg(msg : String);
@@ -102,10 +105,102 @@ end;
 // settings read/write functions
 // ********************************************************************
 
+function GetRelativeX(relativeTo : TForm; offset : Real) : Real;
+begin
+	if Assigned(relativeTo) then begin
+		Result := relativeTo.Left + offset;
+	end else begin
+		Result := offset;
+	end;
+end;
+function GetRelativeY(relativeTo : TForm; offset : Real) : Real;
+begin
+	if Assigned(relativeTo) then begin
+		Result := relativeTo.Top + offset;
+	end else begin
+		Result := offset;
+	end;
+end;
+
+function AddLabel(relativeTo : TForm; offsetX, offsetY, width, height : Real; value : String) : TLabel;
+var
+	lbl : TLabel;
+begin
+	lbl := TLabel.Create(mainForm);
+	lbl.Parent := mainForm;
+	lbl.Width := width;
+	lbl.Height := height;
+	lbl.Left := GetRelativeX(relativeTo, offsetX);
+	lbl.Top := GetRelativeY(relativeTo, offsetY);
+	lbl.Caption := value;
+	Result := lbl;
+end;
+
+function AddLine(relativeTo : TForm; offsetX, offsetY, width : Real; value, hint : String) : TEdit;
+var
+	line : TEdit;
+begin
+	line := TEdit.Create(mainForm);
+	line.Parent := mainForm;
+	line.Left := GetRelativeX(relativeTo, offsetX);
+	line.Top := GetRelativeY(relativeTo, offsetY);
+	line.Width := width;
+	line.Caption := value;
+	line.Font.Size := 10;
+	line.Hint := hint;
+	line.ShowHint := (hint <> '');
+	Result := line;
+end;
+
+function AddBox(relativeTo : TForm; offsetX, offsetY, width, height : Real; caption : String) : TGroupBox;
+var
+	box : TGroupBox;
+begin
+	box := TGroupBox.Create(mainForm);
+	box.Parent := mainForm;
+	box.Left := GetRelativeX(relativeTo, offsetX);
+	box.Top := GetRelativeY(relativeTo, offsetY);	
+	box.Caption := caption;
+	box.Font.Size := 10;
+	box.ClientWidth := width;
+	box.ClientHeight := height;
+	Result := box;
+end;
+
+function AddButton(relativeTo : TForm; offsetX, offsetY : Real; caption : String; modalResult : Integer) : TButton;
+var
+	button : TButton;
+begin
+	button := TButton.Create(mainForm);
+	button.Parent := mainForm;
+	button.Left := GetRelativeX(relativeTo, offsetX);
+	button.Top := GetRelativeY(relativeTo, offsetY);	
+	button.Caption := caption;
+	button.ModalResult := modalResult;
+	Result := button;
+end;
+
+function AddCheckBox(relativeTo : TForm; offsetX, offsetY : Real; value : Boolean; caption, hint : String) : TCheckBox;
+var
+	checkBox : TCheckBox;
+begin
+	checkBox := TCheckBox.Create(mainForm);
+	checkBox.Parent := mainForm;
+	checkBox.Left := GetRelativeX(relativeTo, offsetX);
+	checkBox.Top := GetRelativeY(relativeTo, offsetY);
+	checkBox.Width := 500;
+	checkBox.Caption := caption;
+	checkBox.Checked := value;
+	checkBox.Hint := hint;
+	checkBox.ShowHint := (hint <> '');
+	Result := checkBox;
+end;
+
 procedure Log(msg: String);
 begin
 	addmessage(msg);
 	messageLog.add('['+TimeToStr(Time)+'] '+msg);	
+	messageLog.SaveToFile(editScriptsSubFolder+'\Log.txt');
 end;
 
 {
@@ -222,12 +317,12 @@ end;
 {
 	Creates the esp plugin. Creates LSCR and STAT records for every new loading screen and disables other loading screens.
 }
-function CreateESP(fileName : String; disableOthers : Boolean) : IwbFile;
+function CreateESP(fileName, meshPath : String; disableOthers, includeMessages : Boolean; frequency : Integer) : IwbFile;
 var
 	esp : IwbFile;
 	i : Integer;
 	lscrRecord, statRecord : IwbMainRecord;
-	editorID : String;
+	editorID, prefix, meshPath : String;
 	esl : Boolean;
 begin
 	esp := FileByName(fileName);
@@ -240,6 +335,8 @@ begin
 	esl := (wbAppName = 'SSE') and (imagePathArray.Count() < 1024);
 	SetElementNativeValues(ElementByIndex(esp, 0), 'Record Header\Record Flags\ESL', esl);
 
+	prefix := ReadSetting(skPrefix);
+
 	ClearGroup(esp, 'LSCR');
 	ClearGroup(esp, 'STAT');
 	CleanMasters(esp);
@@ -249,14 +346,14 @@ begin
 		editorID := inttostr(i); //StringReplace(imagePathArray[i] ,' ', '_', [rfReplaceAll, rfIgnoreCase]);
 
 		statRecord := Add(GroupBySignature(esp, 'STAT'), 'STAT', True);
-		SetEditorID(statRecord ,'J_STAT_' + editorID);
+		SetEditorID(statRecord , prefix +'STAT_' + editorID);
 
 		Add(statRecord, 'MODL', True);
-		SetValueString(statRecord, 'Model\MODL - Model FileName', 'JLoadScreens\' + imagePathArray[i] + '.nif');
+		SetValueString(statRecord, 'Model\MODL - Model FileName', meshPath + '\' + imagePathArray[i] + '.nif');
 		SetValueInt(statRecord, 'DNAM\Max Angle (30-120)', 90);
 
 		lscrRecord := Add(GroupBySignature(esp, 'LSCR'), 'LSCR', True);
-		SetEditorID(lscrRecord, 'J_LSCR_' + editorID);
+		SetEditorID(lscrRecord, prefix + 'LSCR_' + editorID);
 		SetLinksTo(lscrRecord, 'NNAM', statRecord);
 		Add(lscrRecord, 'SNAM', True);
 		SetValueInt(lscrRecord, 'SNAM', 2);
@@ -268,11 +365,12 @@ begin
 
 		Add(lscrRecord, 'Conditions', True);
 		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Type', 10100000);
-		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', 100);
+		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', frequency);
 		SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetRandomPercent');
 
-		SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
-
+		if includeMessages then begin
+			SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
+		end;
 	end;
 	if disableOthers then begin
 		PatchLoadingScreens(esp);
@@ -309,7 +407,11 @@ begin
 		// If the image is wider than the display, black bars on the top and bottom are required.
 		// This is achieved by reducing the height of the model.
 		if displayRatio < imageRatio then begin
-			height := height * displayRatio / imageRatio;
+			if ReadSettingBool(skFullHeight) then begin
+				width := width * imageRatio / displayRatio;
+			end else begin
+				height := height * displayRatio / imageRatio;
+			end;
 		end;
 	end;
 
@@ -322,7 +424,7 @@ end;
 	Create meshes based on a template.
 	Set texture and vertex positions according to image and screen resolution.
 }
-procedure CreateMeshes(targetPath : string; templateNif : TwbNifFile; stretch, sse : Boolean);
+procedure CreateMeshes(targetPath, texturePath : string; templateNif : TwbNifFile; stretch, sse : Boolean; displayRatio : Real);
 var
 	i, j, vertices : integer;
 	Textures, VertexData: TdfElement;
@@ -332,7 +434,7 @@ begin
 	for i:=0 to Pred(imagePathArray.Count()) do begin
 		if sse then TextureSet := templateNif.Blocks[3] else TextureSet := templateNif.Blocks[4];
 		Textures := TextureSet.Elements['Textures'];
-		Textures[0].EditValue := 'textures\JLoadScreens\' + imagePathArray[i] + '.dds';
+		Textures[0].EditValue := texturePath + '\' + imagePathArray[i] + '.dds';
 
 		FitToDisplayRatio(displayRatio, strtofloat(imageWidthArray[i])/strtofloat(imageHeightArray[i]), stretch);
 		if sse then begin
@@ -372,7 +474,7 @@ begin
 		VertexData[3].NativeValues[VertexPrefix + 'X'] := sourceOffsetX + sourceUpperWidth * widthFactor;
 		VertexData[3].NativeValues[VertexPrefix + 'Y'] := sourceOffsetY + sourceHeight * heightFactor - sourceHeightOffset * heightFactor;
 
-		templateNif.SaveToFile(targetPath + imagePathArray[i] + '.nif');
+		templateNif.SaveToFile(targetPath + '\' + imagePathArray[i] + '.nif');
 	end;
 end;
 
@@ -574,23 +676,63 @@ begin
 	Log('	');
 end;
 
+
+procedure CreateESPOptions(modName, modFolder : String; disableOthers : Boolean; msgSetting : Integer; selectableFrequency : Boolean; frequency : Integer );
+begin
+	if msgSetting = 0 then begin
+		if selectableFrequency then begin
+			CreateESP('FOMOD_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
+		end else begin
+			CreateESP('FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
+		end;
+	end else if msgSetting = 1 then begin
+		if selectableFrequency then begin
+			CreateESP('FOMOD_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
+		end else begin
+			CreateESP('FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
+		end;
+	end else if msgSetting = 2 then begin
+		if selectableFrequency then begin
+			CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
+			CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
+		end else begin
+			CreateESP('FOMOD_M0_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
+			CreateESP('FOMOD_M1_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
+		end;
+	end
+end;
+
 {
 	Main function.
 }
-procedure Main(sourcePath : String; disableOthers, recursive : Boolean);
+procedure Main(sourcePath : String; disableOthers, recursive, advanced : Boolean);
 var
-	templatePath, texturePath, meshPath : string;
+	templatePath, texturePath, meshPath, texturePathShort : string;
 	templateNif: TwbNifFile;
+	aspectRatioList, sideList, widthList, heightList : TStringList;
+	i, msgSetting, frequencySetting : Integer;
 begin
 	Log('	Using source path: ' + sourcePath);
 	templatePath := editScriptsSubFolder;
-	texturePath := DataPath + 'textures\JLoadScreens';
-	meshPath := DataPath + 'meshes\JLoadScreens\';
 
-	// MO2 automatically creates folders
-	// Force directories, so it works without MO2
-	forcedirectories(meshPath);
-	forcedirectories(texturePath);
+	if advanced then begin
+		texturePath := DataPath + 'textures\' + ReadSetting(skModFolder);
+		texturePathShort :=  'textures\' + ReadSetting(skModFolder);
+		meshPath := DataPath + 'meshes\' + ReadSetting(skModFolder);
+
+		forcedirectories(texturePath);
+	end else begin
+		texturePath := DataPath + 'textures\JLoadScreens';
+		texturePathShort := 'textures\JLoadScreens';
+		meshPath := DataPath + 'meshes\JLoadScreens';
+
+		// MO2 automatically creates folders
+		// Force directories, so it works without MO2
+		forcedirectories(meshPath);
+		forcedirectories(texturePath);
+	end;
+
+
 
 	// Create .dds files in texture path
 	ProcessTextures(sourcePath, texturePath, recursive);
@@ -608,10 +750,88 @@ begin
 	end;
 
 	// Create .nif files in mesh path
-	CreateMeshes(meshPath, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE');
+	if advanced then begin
+		// loop through aspect ratios and create meshes in subfolder
+		Log(ReadSetting(skAspectRatios));
+
+		aspectRatioList := TStringList.Create();
+		aspectRatioList.Delimiter := ',';
+		aspectRatioList.StrictDelimiter := True;
+   		aspectRatioList.DelimitedText   := ReadSetting(skAspectRatios);
+
+		widthList := TStringList.Create();
+		heightList := TStringList.Create();
+		try
+			for i:=0 to Pred(aspectRatioList.Count()) do begin
+				Log('aspectRatioList[i] = ' + aspectRatioList[i]);
+				sideList := TStringList.Create();
+				sideList.Delimiter := 'x';
+				sideList.StrictDelimiter := True;
+				sideList.DelimitedText := aspectRatioList[i];
+
+				widthList.add(sideList[0]);
+				heightList.add(sideList[1]);
+			end;
+		except
+			on E : Exception do begin
+				Log(E.ClassName + ' error raised, with message : ' + E.Message);
+				Log('Error while parsing the aspect ratio list: ' + ReadSetting(skAspectRatios));
+				Raise E;
+			end;
+		end;
+		for i:=0 to Pred(aspectRatioList.Count()) do begin
+			forcedirectories(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder));
+			CreateMeshes(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder), texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', strtofloat(widthList[i]) / strtofloat(heightList[i]) );
+		end;
+
+
+	end else begin
+		CreateMeshes(meshPath, texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', ReadSettingInt(skDisplayWidth) / ReadSettingInt(skDisplayHeight));
+	end;
 
 	// Create .esp
-	CreateESP(modName, disableOthers);
+	if advanced then begin
+		Log(ReadSetting(skMessages));
+		
+		if ReadSetting(skFrequencyOptions) = 'selectable' then begin
+			frequencySetting := 2;
+		end else if ReadSetting(skFrequencyOptions) = 'always' then begin
+			frequencySetting := 1;
+		end else if ReadSetting(skFrequencyOptions) = 'vanilla' then begin
+			frequencySetting := 0;
+		end else begin
+			frequencySetting := 1;
+			Log('The frequency option ' + ReadSetting(skFrequencyOptions) + ' is invalid; "always" will be used instead.');
+		end;
+
+		if ReadSetting(skMessages) = 'optional' then begin
+			msgSetting := 2;
+		end else if ReadSetting(skMessages) = 'always' then begin
+			msgSetting := 1;
+		end else if ReadSetting(skMessages) = 'never' then begin
+			msgSetting := 0;
+		end else begin
+			msgSetting := 1;
+			Log('The messages option ' + ReadSetting(skMessages) + ' is invalid; "always" will be used instead.');
+		end;
+
+		if frequencySetting = 2 then begin
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 5);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 10);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 15);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 25);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 35);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 50);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 70);
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 100);
+		end else if frequencySetting = 1 then begin
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, false, 100);
+		end else if frequencySetting = 0 then begin			
+			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, false, 10);
+		end;
+	end else begin
+		CreateESP(modName, ReadSetting(skModFolder), disableOthers, true, ReadSettingInt(skFrequency));
+	end;
 end;
 
 {
@@ -623,7 +843,7 @@ var
 	path : String;
 begin
 	path := ReadSetting(skSourcePath);
-	path := IncludeTrailingBackslash(SelectDirectory('Select folder for generated meshes', '', path, ''));
+	path := SelectDirectory('Select folder for generated meshes', '', path, '');
 	if path <> '\' then begin
 		Sender.Text := path;
 		WriteSetting(skSourcePath, path);
@@ -655,153 +875,146 @@ begin
 	Result := line;
 end;
 
-{
-	Show the UI. Run main function on OK.
-}
-function UI: Integer;
+
+function Advanced: Integer;
 var
-	mainForm: TForm;
-  	selectDirLabel, screenResolutionLabel, colonLabel, imageAdjustmentLabel, gammaLabel, contrastLabel, brightnessLabel, saturationLabel: TLabel;
-	screenResolutionBox, selectDirBox, optionsBox, imageAdjustmentBox : TGroupBox;
-	selectDirLine, widthLine, heightLine, gammaLine, contrastLine, brightnessLine, saturationLine : TEdit;
-	checkBoxDisableOthers, checkBoxStretch, checkBoxSubDirs : TCheckBox;
+  	modNameLabel, modVersionLabel, modFolderLabel, modPluginLabel, modAuthorLabel, modPrefixLabel, messagesLabel, frequencyLabel: TLabel;
+	screenResolutionBox, optionsBox, modBox : TGroupBox;
+	screenResolutionLine, modNameLine, modVersionLine, modFolderLine, modPluginLine, modAuthorLine, modPrefixLine, messagesLine, frequencyLine : TEdit;
 	btnOk, btnCancel: TButton;
-	tmpInt : Integer;
+	tmpInt, modalResult : Integer;
 	tmpReal : Real;
 begin
 	mainForm := TForm.Create(nil);
 	try
 		mainForm.Caption := 'Jampion''s Loading Screen Generator';
 		mainForm.Width := 640;
-		mainForm.Height := 480;
+		mainForm.Height := 500;
 		mainForm.Position := poScreenCenter;
 
-		
-		selectDirBox := TGroupBox.Create(mainForm);
-		selectDirBox.Parent := mainForm;
-		selectDirBox.Top := 8;
-		selectDirBox.Left := 8;
-		selectDirBox.Caption := 'Source Directory';
-		selectDirBox.Font.Size := 10;
-		selectDirBox.ClientWidth := mainForm.Width-24;
-		selectDirBox.ClientHeight := 48;
+		screenResolutionBox := AddBox(mainForm, 8, 8, mainForm.Width-24, 48, 'Aspect Ratios');
+		screenResolutionLine := AddLine(screenResolutionBox, 16, 16, mainForm.Width - 128, ReadSetting(skAspectRatios), 'Comma separated list of aspect ratios, e.g. "16x9,16x10,21x9"');
 
-		selectDirLine := TEdit.Create(mainForm);
-		selectDirLine.Parent := mainForm;
-		selectDirLine.Top := selectDirBox.Top + 16;
-		selectDirLine.Left := 16;
-		selectDirLine.Width := mainForm.Width - 40;
-		selectDirLine.Caption := ReadSetting(skSourcePath);
-		selectDirLine.Font.Size := 10;
-		selectDirLine.Hint := 'Click to select folder in explorer';
-		selectDirLine.ShowHint := true;
+		modBox := AddBox(screenResolutionBox, 0, screenResolutionBox.Height + 8, mainForm.Width-24, 176, 'Mod Configuration');
+
+		modNameLabel := AddLabel(modBox, 16, 24, 160, 24, 'Mod name');
+		modNameLine := AddLine(modNameLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModName), 'The display name of the mod. Will be used for the FOMOD installer.');
+
+		modVersionLabel := AddLabel(modNameLabel, 0, 24, 160, 24, 'Mod version');
+		modVersionLine := AddLine(modVersionLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModVersion), 'Will be used for the FOMOD installer.');
+
+		modFolderLabel := AddLabel(modVersionLabel, 0, 24, 160, 24, 'Sub folder');
+		modFolderLine := AddLine(modFolderLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModFolder), 'Sub folder, in which textures and meshes are generated. "MyMod" will result in "textures/MyMod" and "meshes/MyMod".');
+
+		modAuthorLabel := AddLabel(modFolderLabel, 0, 24, 160, 24, 'Author');
+		modAuthorLine := AddLine(modAuthorLabel, 80, -4, mainForm.Width - 128, ReadSetting(skModAuthor), 'Your name :).');
+
+		modPluginLabel := AddLabel(modAuthorLabel, 0, 24, 160, 24, 'Plugin');
+		modPluginLine := AddLine(modPluginLabel, 80, -4, mainForm.Width - 128, ReadSetting(skPluginName), 'The name of the generated plugin (with extension).');
+
+		modPrefixLabel := AddLabel(modPluginLabel, 0, 24, 160, 24, 'Prefix');
+		modPrefixLine := AddLine(modPrefixLabel, 80, -4, mainForm.Width - 128, ReadSetting(skPrefix), 'This prefix is added to all records.');
+
+		optionsBox := AddBox(modBox, 0, modBox.Height + 8, mainForm.Width-24, 128, 'Options');
+
+		messagesLabel := AddLabel(optionsBox, 16, 24, 160, 24, 'Messages');
+		messagesLine := AddLine(messagesLabel, 80, -4, mainForm.Width - 128, ReadSetting(skMessages), 'always/never/optional');
+
+		frequencyLabel := AddLabel(messagesLabel, 0, 24, 160, 24, 'Frequency');
+		frequencyLine := AddLine(frequencyLabel, 80, -4, mainForm.Width - 128, ReadSetting(skFrequencyOptions), 'always/vanilla/selectable');
+
+
+		btnOk := AddButton(nil, 8, mainForm.Height - 64, 'OK', 1);
+		btnCancel := AddButton(btnOk, 80, 0, 'Cancel', 2);
+		modalResult := mainForm.ShowModal;
+		Log(inttostr(modalResult));
+		if modalResult = 1 then begin
+
+			WriteSetting(skAspectRatios, screenResolutionLine.Text);
+			WriteSetting(skModName, modNameLine.Text);
+			WriteSetting(skModVersion, modVersionLine.Text);
+			WriteSetting(skModFolder, modFolderLine.Text);
+			WriteSetting(skModAuthor, modAuthorLine.Text);
+			WriteSetting(skPluginName, modPluginLine.Text);
+			WriteSetting(skPrefix, modPrefixLine.Text);
+			WriteSetting(skMessages, messagesLine.Text);
+			WriteSetting(skFrequencyOptions, frequencyLine.Text);
+
+			SaveSettings();
+			if not error then begin
+				Main(ReadSetting(skSourcePath), ReadSettingBool(skDisableOtherLoadScreens), ReadSettingBool(skRecursive), true);
+			end else begin
+				Log('	');
+				Log('At least one setting has an incorrect value.');
+				Log('	');
+			end;
+		end;
+	finally
+    	mainForm.Free;
+  	end;
+
+end;
+
+{
+	Show the UI. Run main function on OK.
+}
+function UI: Integer;
+var
+  	selectDirLabel, screenResolutionLabel, colonLabel, frequencyLabel, imageAdjustmentLabel, gammaLabel, contrastLabel, brightnessLabel, saturationLabel: TLabel;
+	screenResolutionBox, selectDirBox, optionsBox, imageAdjustmentBox : TGroupBox;
+	selectDirLine, widthLine, heightLine, gammaLine, contrastLine, brightnessLine, saturationLine, frequencyLine : TEdit;
+	checkBoxDisableOthers, checkBoxStretch, checkBoxSubDirs, checkBoxTestMode, checkBoxFullHeight : TCheckBox;
+	btnOk, btnCancel, btnAdvanced: TButton;
+	tmpInt, modalResult : Integer;
+	tmpReal : Real;
+begin
+	mainForm := TForm.Create(nil);
+	try
+		mainForm.Caption := 'Jampion''s Loading Screen Generator';
+		mainForm.Width := 640;
+		mainForm.Height := 500;
+		mainForm.Position := poScreenCenter;
+
+		selectDirBox := AddBox(mainForm, 8, 0, mainForm.Width-24, 48, 'Source Directory');
+		selectDirLine := AddLine(selectDirBox, 8, 16, mainForm.Width - 128, ReadSetting(skSourcePath), 'Click to select folder in explorer.');
 		selectDirLine.OnClick := PickSourcePath;
 
+		screenResolutionBox := AddBox(selectDirBox, 0, selectDirBox.Height + 8, mainForm.Width-24, 80, 'Target Aspect Ratio');
 
-		screenResolutionBox := TGroupBox.Create(mainForm);
-		screenResolutionBox.Parent := mainForm;
-		screenResolutionBox.Top := selectDirBox.Top + selectDirBox.Height;
-		screenResolutionBox.Left := 8;
-		screenResolutionBox.Caption := 'Target Aspect Ratio';
-		screenResolutionBox.Font.Size := 10;
-		screenResolutionBox.ClientWidth := mainForm.Width-24;
-		screenResolutionBox.ClientHeight := 80;
-
-		widthLine := TEdit.Create(mainForm);
-		widthLine.Parent := mainForm;
-		widthLine.Top := screenResolutionBox.Top + 16;
-		widthLine.Left := 16;
-		widthLine.Width := 64;
-		widthLine.Caption := ReadSetting(skDisplayWidth);
-		widthLine.Font.Size := 10;
-		widthLine.Hint := 'Select your display width';
-		widthLine.ShowHint := true;
-		widthLine.OnClick := nil;
-
-		colonLabel := TLabel.Create(mainForm);
-		colonLabel.Parent := mainForm;
-		colonLabel.Width := 8;
-		colonLabel.Height := 30;
-		colonLabel.Left := widthLine.Left + widthLine.Width;
-		colonLabel.Top := widthLine.Top;
-		colonLabel.Caption := ':';
+		widthLine := AddLine(screenResolutionBox, 8, 16, 64, ReadSetting(skDisplayWidth), 'Enter your display width.');
+		colonLabel := AddLabel(widthLine, widthLine.Width, 0, 8, 30, ':');
 		colonLabel.Font.Size := 12;
+		heightLine := AddLine(colonLabel, 8, 0, 64, ReadSetting(skDisplayHeight), 'Enter your display height.');
 
-		heightLine := TEdit.Create(mainForm);
-		heightLine.Parent := mainForm;
-		heightLine.Top := colonLabel.Top;
-		heightLine.Left := colonLabel.Left + colonLabel.width;
-		heightLine.Width := 64;
-		heightLine.Caption := ReadSetting(skDisplayHeight);
-		heightLine.Font.Size := 10;
-		heightLine.Hint := 'Select your display height';
-		heightLine.ShowHint := true;
-		heightLine.OnClick := nil;
-
-		screenResolutionLabel := TLabel.Create(mainForm);
-		screenResolutionLabel.Parent := mainForm;
-		screenResolutionLabel.Width := screenResolutionBox.Width - 16;
-		screenResolutionLabel.Height := 120;
-		screenResolutionLabel.Left := widthLine.Left;
-		screenResolutionLabel.Top := widthLine.Top + widthLine.Height;
-		screenResolutionLabel.Caption :=
-			'The loading screens will be generated for this aspect ratio.'#13#10
-			'Either use your resolution (e.g. 1920:1080) or your aspect ratio (e.g. 16:9).';
+ 		screenResolutionLabel := AddLabel(widthLine, 0, widthLine.Height, screenResolutionBox.Width - 16, 120, 
+		 	'The loading screens will be generated for this aspect ratio.'#13#10
+			'Either use your resolution (e.g. 1920:1080) or your aspect ratio (e.g. 16:9).'
+		);
 		screenResolutionLabel.Font.Size := 9;
-		
-		optionsBox := TGroupBox.Create(mainForm);
-		optionsBox.Parent := mainForm;
-		optionsBox.Top := screenResolutionBox.Top + screenResolutionBox.Height;
-		optionsBox.Left := 8;
-		optionsBox.Caption := 'Options';
-		optionsBox.Font.Size := 10;
-		optionsBox.ClientWidth := mainForm.Width-24;
-		optionsBox.ClientHeight := 80;
 
-		checkBoxDisableOthers := TCheckBox.Create(mainForm);
-		checkBoxDisableOthers.Parent := mainForm;
-		checkBoxDisableOthers.Caption := 'Disable other Loading Screens';
-		checkBoxDisableOthers.Top := optionsBox.Top + 16;
-		checkBoxDisableOthers.Left := 16;
-		checkBoxDisableOthers.Width := 260;
-		checkBoxDisableOthers.Checked := ReadSettingBool(skDisableOtherLoadScreens);
-		checkBoxDisableOthers.Hint := 'Prevents other loading screens (other mods and vanilla) from showing.';
-		checkBoxDisableOthers.ShowHint := True;
+		optionsBox := AddBox(screenResolutionBox, 0, screenResolutionBox.Height + 8, mainForm.Width-24, 128, 'Options');
 
-
-		checkBoxStretch := TCheckBox.Create(mainForm);
-		checkBoxStretch.Parent := mainForm;
-		checkBoxStretch.Caption := 'Stretch images to fill the entire screen';
-		checkBoxStretch.Top := checkBoxDisableOthers.Top + checkBoxDisableOthers.Height;
-		checkBoxStretch.Left := checkBoxDisableOthers.Left;
-		checkBoxStretch.Width := 260;
-		checkBoxStretch.Checked := ReadSettingBool(skStretch);
-		checkBoxStretch.Hint := 'Stretches images, if their aspect ratio differs from the target aspect ratio.';
-		checkBoxStretch.ShowHint := True;
-
-		checkBoxSubDirs := TCheckBox.Create(mainForm);
-		checkBoxSubDirs.Parent := mainForm;
-		checkBoxSubDirs.Caption := 'Include subdirectories';
-		checkBoxSubDirs.Top := checkBoxStretch.Top + checkBoxStretch.Height;
-		checkBoxSubDirs.Left := checkBoxStretch.Left;
-		checkBoxSubDirs.Width := 260;
-		checkBoxSubDirs.Checked := ReadSettingBool(skStretch);
-		checkBoxSubDirs.Hint := 'Includes subdirectories of the source directory, when searching for images.';
-		checkBoxSubDirs.ShowHint := True;
+		checkBoxDisableOthers := AddCheckBox(optionsBox, 8, 16, ReadSettingBool(skDisableOtherLoadScreens), 'Disable other Loading Screens', 'Prevents other loading screens (other mods and vanilla) from showing.');
+		checkBoxStretch := AddCheckBox(checkBoxDisableOthers, 0, 16, ReadSettingBool(skStretch), 'Stretch images to fill the entire screen', 'Stretches images, if their aspect ratio differs from the target aspect ratio.');
+		checkBoxFullHeight := AddCheckBox(checkBoxStretch, 0, 16, ReadSettingBool(skFullHeight), 'Force full height', 'There are no black bars at the top and bottom. Wider pictures will be cropped at the sides.');
+		checkBoxSubDirs := AddCheckBox(checkBoxFullHeight, 0, 16, ReadSettingBool(skRecursive), 'Include subdirectories', 'Includes subdirectories of the source directory, when searching for images.');
+		checkBoxTestMode := AddCheckBox(checkBoxSubDirs, 0, 16, ReadSettingBool(skTestMode), 'Test Mode', 'Adds a global variable, which can be used to force specific loading screens.');
+		frequencyLabel := AddLabel(checkBoxTestMode, 0, 24, 64, 24, 'Frequency:');
+		frequencyLine := AddLine(frequencyLabel, 64, -4, 64, ReadSetting(skFrequency), 'Loading screen frequency: 0 - 100');
 
 		imageAdjustmentBox := TGroupBox.Create(mainForm);
 		imageAdjustmentBox.Parent := mainForm;
-		imageAdjustmentBox.Top := optionsBox.Top + optionsBox.Height;
+		imageAdjustmentBox.Top := optionsBox.Top + optionsBox.Height + 8;
 		imageAdjustmentBox.Left := 8;
 		imageAdjustmentBox.Caption := 'Image Adjustments';
 		imageAdjustmentBox.Font.Size := 10;
 		imageAdjustmentBox.ClientWidth := mainForm.Width-24;
-		imageAdjustmentBox.ClientHeight := 192;
+		imageAdjustmentBox.ClientHeight := 152;
 
 		imageAdjustmentLabel := TLabel.Create(mainForm);
 		imageAdjustmentLabel.Parent := mainForm;
 		imageAdjustmentLabel.Width := imageAdjustmentBox.Width - 16;
-		imageAdjustmentLabel.Height := 72;
+		imageAdjustmentLabel.Height := 80;
 		imageAdjustmentLabel.Left := 16;
 		imageAdjustmentLabel.Top := imageAdjustmentBox.Top + 20;
 		imageAdjustmentLabel.Caption :=
@@ -815,27 +1028,15 @@ begin
 		gammaLine := ImageAdjustment(saturationLine, floattostr(ReadSetting(skGamma)), 'Gamma: Increase to brighten the loading screens. Default: 1.0, Range: 0.0 - 4.0');
 
 
+		btnOk := AddButton(nil, 8, mainForm.Height - 64, 'OK', 1);
+		btnCancel := AddButton(btnOk, btnOk.Width + 16, 0, 'Cancel', -1);
+		btnAdvanced := AddButton(nil, mainForm.Width - 96, mainForm.Height - 64, 'Advanced', 2);
 
-		btnOk := TButton.Create(mainForm);
-		btnOk.Parent := mainForm;
-		btnOk.Left := 8;
-		btnOk.Top := mainForm.Height - 64;
-		btnOk.Caption := 'OK';
-		btnOk.ModalResult := mrOk;
-
-		btnCancel := TButton.Create(mainForm);
-		btnCancel.Parent := mainForm;
-		btnCancel.Caption := 'Cancel';
-		btnCancel.ModalResult := mrCancel;
-		btnCancel.Left := btnOk.Left + btnOk.Width + 16;
-		btnCancel.Top := btnOk.Top;
-
-		if mainForm.ShowModal = mrOk then begin
-
+		modalResult := mainForm.ShowModal;
+		if (modalResult = 1) or (modalResult = 2) then begin
 			if DirectoryExists(selectDirLine.Text) then WriteSetting(skSourcePath, selectDirLine.Text) else ErrorMsg('The source directory does not exist.');
 
-			WriteSetting(skDisableOtherLoadScreens, checkBoxDisableOthers.Checked);
-			WriteSetting(skStretch, checkBoxStretch.Checked);
+
 
 			tmpInt := strtoint(widthLine.Text);
 			
@@ -843,9 +1044,15 @@ begin
 			tmpInt := strtoint(heightLine.Text);
 			if tmpInt > 0 then WriteSetting(skDisplayHeight, tmpInt) else ErrorMsg('Height must be positive number.');
 
-			displayRatio := ReadSettingInt(skDisplayWidth) / ReadSettingInt(skDisplayHeight);
 
+			WriteSetting(skDisableOtherLoadScreens, checkBoxDisableOthers.Checked);
+			WriteSetting(skStretch, checkBoxStretch.Checked);
 			WriteSetting(skRecursive, checkBoxSubDirs.Checked);
+			WriteSetting(skFullHeight, checkBoxFullHeight.Checked);
+			WriteSetting(skTestMode, checkBoxTestMode.Checked);
+			
+			tmpInt := strtoint(frequencyLine.Text);
+			if (tmpInt >= 0) and (tmpInt <= 100) then WriteSetting(skFrequency, tmpInt ) else ErrorMsg('Frequency must be between 0 and +100.');
 
 			brightness := strtoint(brightnessLine.Text);
 			if (brightness >= -100) and (brightness <= 100) then WriteSetting(skBrightness, brightness ) else ErrorMsg('Brightness must be between -100 and +100.');
@@ -872,7 +1079,9 @@ begin
 			if not error then begin
 				brightness := brightness + 100;
 				saturation := saturation + 100;
-				Main(ReadSetting(skSourcePath), ReadSettingBool(skDisableOtherLoadScreens), ReadSettingBool(skRecursive));
+				if modalResult = 1 then begin
+					Main(ReadSetting(skSourcePath), ReadSettingBool(skDisableOtherLoadScreens), ReadSettingBool(skRecursive), false);
+				end;
 			end else begin
 				Log('	');
 				Log('At least one setting has an incorrect value.');
@@ -883,6 +1092,10 @@ begin
 	finally
     	mainForm.Free;
   	end;
+
+	if (modalResult = 2) and not error then begin
+		Advanced();
+	end;
 end;
 
 {
@@ -931,6 +1144,22 @@ begin
 
 	skBrightness := GetSettingKey('0');
 	skSaturation := GetSettingKey('0');
+
+	skFullHeight := GetSettingKey('False');
+	skTestMode := GetSettingKey('False');
+	skFrequency := GetSettingKey('100');
+
+	skModName :=  GetSettingKey('Nazeem''s Loading Screen Mod');
+	skModVersion :=  GetSettingKey('1.0.0');
+	skModFolder := GetSettingKey('NazeemLoadScreens');
+	skPluginName := GetSettingKey('NazeemsLoadingScreenMod.esp');
+	skModAuthor := GetSettingKey('Nazeem');
+	skPrefix := GetSettingKey('Nzm_');
+	skAspectRatios := GetSettingKey('16x9,16x10,21x9,4x3');
+	skTextureResolutions := GetSettingKey('2');
+	skMessages := GetSettingKey('optional');
+	skFrequencyOptions := GetSettingKey('selectable');
+
 end;
 
 function Initialize: Integer;
@@ -948,7 +1177,6 @@ end;
 
 function Finalize: Integer;
 begin
-	messageLog.SaveToFile(editScriptsSubFolder+'\Log.txt');
 end;
 
 end.
