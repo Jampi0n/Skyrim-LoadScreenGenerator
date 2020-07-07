@@ -32,7 +32,7 @@ const
 var
 	editScriptsSubFolder : String;
 	messageLog, settings : TStringList;
-	settingKey : Integer;
+	settingKey, totalLoadScreens : Integer;
 	heightFactor, widthFactor : Real;
 
 	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, sk4K : Integer;
@@ -119,6 +119,76 @@ begin
 	end else begin
 		Result := offset;
 	end;
+end;
+
+function ApproximateProbability(approximationArray : TStringList) : Real;
+var
+	i : Integer;
+	approx : Real;
+begin
+	approx := 1.0;
+	for i:= 0 to Pred(approximationArray.Count()) do begin
+		approx := approx * strtofloat(approximationArray[i])
+	end;
+	Result := approx;
+end;
+
+function Abs(x : Real) : Real;
+begin
+	if x < 0 then Result:=-x else Result:=x;
+end;
+
+function ProbabilityLoss(probability : Real; approximationArray : TStringList) : Real;
+begin
+	Result := Abs(ApproximateProbability(approximationArray) / probability - 1.0 );
+end;
+
+function CreateRandomProbability(probability : Real; num_approx : Integer) : TStringList;
+var
+	i, j : Integer;
+	dividedProb, bestLoss, currentLoss : Real;
+	currentAttempt, bestAttempt, prevAttempt : TStringList;
+begin
+	Log('probability='+floattostr(probability));
+	dividedProb := Trunc(100.0 * Power(probability, 1.0 / num_approx)) / 100.0;
+
+	bestLoss := 1;
+	bestAttempt := nil;
+
+	currentAttempt := TStringList.Create();
+	for i:=0 to Pred(num_approx) do begin
+		currentAttempt.add(floattostr(dividedProb));
+	end;
+	currentLoss := ProbabilityLoss(probability, currentAttempt);
+	Log('currentLoss='+floattostr(currentLoss));
+	if currentLoss < bestLoss then begin
+		bestLoss := currentLoss;
+		bestAttempt := currentAttempt;
+	end;
+
+	for i:=0 to Pred(num_approx) do begin
+		Log('i='+inttostr(i));
+		prevAttempt := currentAttempt;
+		currentAttempt := TStringList.Create();
+		for j:=0 to Pred(num_approx) do begin
+			currentAttempt.add(prevAttempt[j]);
+		end;
+		currentAttempt[i] := floattostr(strtofloat(currentAttempt[i]) + 0.01);
+
+		for j:=0 to Pred(num_approx) do begin
+			Log(currentAttempt[j]);
+		end;
+
+		currentLoss := ProbabilityLoss(probability, currentAttempt);
+		Log('currentLoss='+floattostr(currentLoss));
+		if currentLoss < bestLoss then begin
+			bestLoss := currentLoss;
+			bestAttempt := currentAttempt;
+		end;
+	end;
+
+	Result := bestAttempt;
+
 end;
 
 function AddLabel(relativeTo : TForm; offsetX, offsetY, width, height : Real; value : String) : TLabel;
@@ -228,6 +298,11 @@ begin
 	SetValueString(handle, path, inttostr(value));
 end;
 
+procedure SetValueFloat(handle: IInterface; path, value: float);
+begin
+	SetValueString(handle, path, floattostr(value));
+end;
+
 procedure SetValueHex(handle: IInterface; path, value: integer);
 begin
 	SetValueString(handle, path, IntToHex(value, 8));
@@ -319,10 +394,12 @@ end;
 function CreateESP(fileName, meshPath : String; disableOthers, includeMessages : Boolean; frequency : Integer) : IwbFile;
 var
 	esp : IwbFile;
-	i : Integer;
+	i, j : Integer;
 	lscrRecord, statRecord : IwbMainRecord;
 	editorID, prefix : String;
 	esl : Boolean;
+	probability : Real;
+	approximationArray : TStringList;
 begin
 	esp := FileByName(fileName);
 	if not Assigned(esp) then begin
@@ -364,10 +441,32 @@ begin
 		Add(lscrRecord, 'XNAM', True);
 		SetValueInt(lscrRecord, 'XNAM\X', -45);
 
+		probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
+
+		approximationArray := CreateRandomProbability(probability, 4);
+
+		Log('Result');
 		Add(lscrRecord, 'Conditions', True);
-		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Type', 10100000);
-		SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', frequency);
-		SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetRandomPercent');
+		for j:= 0 to Pred(approximationArray.Count()) do begin
+			Log(approximationArray[j]);
+
+			//Add(lscrRecord, 'Conditions', True);
+			ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
+			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
+			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
+			SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
+		end;
+		Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
+
+		{Log('probability = ' + floattostr(probability));
+		i1 := Round(100 * Power(probability, 1.0/4.0));
+		Log('i1 = ' + inttostr(i1));
+		r1 := Power(0.01 * i1, 4);
+		Log('approx probability = ' + floattostr(r1));}
+
+
+
+
 
 		if includeMessages then begin
 			SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
@@ -552,6 +651,7 @@ begin
 
 	Log('	Creating textures from source images...');
 	for i:=0 to Pred(imageCount) do begin
+		Log('	' + inttostr(i+1) + '/' +  inttostr(imageCount));
 		// Ensure this the only file with this name
 		s := ChangeFileExt(ExtractFileName(sourcePathList[i]),'');
 		if not texturePathList.Find(s, tmp) then begin
@@ -675,7 +775,8 @@ begin
 		Log('	You can give these files unique names and run the script again.');
 		Log('	');
 	end;
-	Log('	Creating loading screens for ' + inttostr(imagePathArray.Count()) + ' images...');
+	totalLoadScreens := imagePathArray.Count();
+	Log('	Creating loading screens for ' + inttostr(totalLoadScreens) + ' images...');
 	Log('	');
 end;
 
