@@ -15,7 +15,6 @@ unit _J_LoadScreenGenerator;
 const
 	version = '1.2.0';
 
-	modName = 'JLoadScreens.esp';
 	scriptName = 'JLoadScreens';
 	settingsName = 'Settings.txt';
 
@@ -37,7 +36,7 @@ var
 	heightFactor, widthFactor : Real;
 
 	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, sk4K : Integer;
-	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyOptions : Integer;
+	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyList, skDefaultFrequency : Integer;
 
 	gamma, blackPoint, whitePoint, brightness, saturation : Real;
 
@@ -322,7 +321,7 @@ var
 	esp : IwbFile;
 	i : Integer;
 	lscrRecord, statRecord : IwbMainRecord;
-	editorID, prefix, meshPath : String;
+	editorID, prefix : String;
 	esl : Boolean;
 begin
 	esp := FileByName(fileName);
@@ -336,6 +335,8 @@ begin
 	SetElementNativeValues(ElementByIndex(esp, 0), 'Record Header\Record Flags\ESL', esl);
 
 	prefix := ReadSetting(skPrefix);
+
+	Log('meshPath='+meshPath);
 
 	ClearGroup(esp, 'LSCR');
 	ClearGroup(esp, 'STAT');
@@ -677,28 +678,16 @@ begin
 end;
 
 
-procedure CreateESPOptions(modName, modFolder : String; disableOthers : Boolean; msgSetting : Integer; selectableFrequency : Boolean; frequency : Integer );
+procedure CreateESPOptions(pluginName, modFolder : String; disableOthers : Boolean; msgSetting : Integer; frequency : Integer );
 begin
+ 	Log('modFolder='+modFolder);
 	if msgSetting = 0 then begin
-		if selectableFrequency then begin
-			CreateESP('FOMOD_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
-		end else begin
-			CreateESP('FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
-		end;
+		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, false, frequency);
 	end else if msgSetting = 1 then begin
-		if selectableFrequency then begin
-			CreateESP('FOMOD_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
-		end else begin
-			CreateESP('FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
-		end;
+		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, true, frequency);
 	end else if msgSetting = 2 then begin
-		if selectableFrequency then begin
-			CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
-			CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
-		end else begin
-			CreateESP('FOMOD_M0_FOMODEND_' + modName, modFolder, disableOthers, false, frequency);
-			CreateESP('FOMOD_M1_FOMODEND_' + modName, modFolder, disableOthers, true, frequency);
-		end;
+		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, false, frequency);
+		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, true, frequency);
 	end
 end;
 
@@ -707,13 +696,15 @@ end;
 }
 procedure Main(sourcePath : String; disableOthers, recursive, advanced : Boolean);
 var
-	templatePath, texturePath, meshPath, texturePathShort : string;
+	templatePath, texturePath, meshPath, texturePathShort, cmd, pluginName : string;
 	templateNif: TwbNifFile;
-	aspectRatioList, sideList, widthList, heightList : TStringList;
-	i, msgSetting, frequencySetting : Integer;
+	aspectRatioList, sideList, widthList, heightList, frequencyList : TStringList;
+	i, msgSetting : Integer;
 begin
 	Log('	Using source path: ' + sourcePath);
 	templatePath := editScriptsSubFolder;
+
+	pluginName := ReadSetting(skPluginName);
 
 	if advanced then begin
 		texturePath := DataPath + 'textures\' + ReadSetting(skModFolder);
@@ -793,17 +784,8 @@ begin
 	if advanced then begin
 		Log(ReadSetting(skMessages));
 		
-		if ReadSetting(skFrequencyOptions) = 'selectable' then begin
-			frequencySetting := 2;
-		end else if ReadSetting(skFrequencyOptions) = 'always' then begin
-			frequencySetting := 1;
-		end else if ReadSetting(skFrequencyOptions) = 'vanilla' then begin
-			frequencySetting := 0;
-		end else begin
-			frequencySetting := 1;
-			Log('The frequency option ' + ReadSetting(skFrequencyOptions) + ' is invalid; "always" will be used instead.');
-		end;
 
+		msgSetting := 1;
 		if ReadSetting(skMessages) = 'optional' then begin
 			msgSetting := 2;
 		end else if ReadSetting(skMessages) = 'always' then begin
@@ -814,23 +796,35 @@ begin
 			msgSetting := 1;
 			Log('The messages option ' + ReadSetting(skMessages) + ' is invalid; "always" will be used instead.');
 		end;
+			frequencyList := TStringList.Create();
+			frequencyList.Delimiter := ',';
+			frequencyList.StrictDelimiter := True;
+			frequencyList.DelimitedText   := ReadSetting(skFrequencyList);
+			for i:=0 to Pred(frequencyList.Count()) do begin
+				CreateESPOptions(pluginName, ReadSetting(skModFolder), disableOthers, msgSetting, strtoint(frequencyList[i]));
+			end;
 
-		if frequencySetting = 2 then begin
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 5);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 10);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 15);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 25);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 35);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 50);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 70);
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, true, 100);
-		end else if frequencySetting = 1 then begin
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, false, 100);
-		end else if frequencySetting = 0 then begin			
-			CreateESPOptions(modName, ReadSetting(skModFolder), disableOthers, msgSetting, false, 10);
-		end;
 	end else begin
-		CreateESP(modName, ReadSetting(skModFolder), disableOthers, true, ReadSettingInt(skFrequency));
+		CreateESP(pluginName, ReadSetting(skModFolder), disableOthers, true, ReadSettingInt(skFrequency));
+	end;
+
+	if advanced then begin
+		{cmd := '/K "python "' + editScriptsSubFolder  + '\Python\create_fomod.py"' +
+		' --aspect-ratios ' + ReadSetting(skAspectRatios) + 
+		' --messages ' + ReadSetting(skMessages) + 
+		' --frequency '+ ReadSetting(skFrequencyOptions) + 
+		' --source "' + ReadSetting(skSourcePath) + '"' +
+		' --mod-folder "' + ReadSetting(skModFolder) + '"' +
+		' --mod-author "' + ReadSetting(skModAuthor) + '"' +
+		' --mod-name "' + ReadSetting(skModName) + '"' +
+		' --mod-version ' + ReadSetting(skModVersion) + 
+		' --data-path "' + ExcludeTrailingBackSlash(DataPath) + '"' +
+		' "';
+		Log(cmd);
+		ShellExecuteWait(0, nil, 'cmd.exe', cmd, '', SW_SHOW);}
+		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.cmd', DataPath + 'create_fomod.cmd', false);
+		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.py', DataPath + 'create_fomod.py' , false);
+		CopyFile(editScriptsSubFolder + '\settings.txt', DataPath + 'settings.txt' , false);
 	end;
 end;
 
@@ -878,9 +872,9 @@ end;
 
 function Advanced: Integer;
 var
-  	modNameLabel, modVersionLabel, modFolderLabel, modPluginLabel, modAuthorLabel, modPrefixLabel, messagesLabel, frequencyLabel: TLabel;
+  	modNameLabel, modVersionLabel, modFolderLabel, modPluginLabel, modAuthorLabel, modPrefixLabel, messagesLabel, frequencyListLabel, frequencyDefaultLabel: TLabel;
 	screenResolutionBox, optionsBox, modBox : TGroupBox;
-	screenResolutionLine, modNameLine, modVersionLine, modFolderLine, modPluginLine, modAuthorLine, modPrefixLine, messagesLine, frequencyLine : TEdit;
+	screenResolutionLine, modNameLine, modVersionLine, modFolderLine, modPluginLine, modAuthorLine, modPrefixLine, messagesLine, frequencyListLine, frequencyDefaultLine : TEdit;
 	btnOk, btnCancel: TButton;
 	tmpInt, modalResult : Integer;
 	tmpReal : Real;
@@ -920,9 +914,11 @@ begin
 		messagesLabel := AddLabel(optionsBox, 16, 24, 160, 24, 'Messages');
 		messagesLine := AddLine(messagesLabel, 80, -4, mainForm.Width - 128, ReadSetting(skMessages), 'always/never/optional');
 
-		frequencyLabel := AddLabel(messagesLabel, 0, 24, 160, 24, 'Frequency');
-		frequencyLine := AddLine(frequencyLabel, 80, -4, mainForm.Width - 128, ReadSetting(skFrequencyOptions), 'always/vanilla/selectable');
+		frequencyListLabel := AddLabel(messagesLabel, 0, 24, 160, 24, 'Freq. List');
+		frequencyListLine := AddLine(frequencyListLabel, 80, -4, mainForm.Width - 128, ReadSetting(skFrequencyList), 'Comma separated list of frequencies, e.g. "5,15,50,100"');
 
+		frequencyDefaultLabel := AddLabel(frequencyListLabel, 0, 24, 160, 24, 'Def. Freq.');
+		frequencyDefaultLine := AddLine(frequencyDefaultLabel, 80, -4, mainForm.Width - 128, ReadSetting(skDefaultFrequency), 'Default frequency.');
 
 		btnOk := AddButton(nil, 8, mainForm.Height - 64, 'OK', 1);
 		btnCancel := AddButton(btnOk, 80, 0, 'Cancel', 2);
@@ -938,7 +934,8 @@ begin
 			WriteSetting(skPluginName, modPluginLine.Text);
 			WriteSetting(skPrefix, modPrefixLine.Text);
 			WriteSetting(skMessages, messagesLine.Text);
-			WriteSetting(skFrequencyOptions, frequencyLine.Text);
+			WriteSetting(skFrequencyList, frequencyListLine.Text);
+			WriteSetting(skDefaultFrequency, frequencyDefaultLine.Text);
 
 			SaveSettings();
 			if not error then begin
@@ -1158,7 +1155,9 @@ begin
 	skAspectRatios := GetSettingKey('16x9,16x10,21x9,4x3');
 	skTextureResolutions := GetSettingKey('2');
 	skMessages := GetSettingKey('optional');
-	skFrequencyOptions := GetSettingKey('selectable');
+
+	skFrequencyList :=  GetSettingKey('5,10,15,25,35,50,70,100');
+	skDefaultFrequency := GetSettingKey('15');
 
 end;
 
