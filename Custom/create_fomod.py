@@ -3,6 +3,7 @@ import shutil
 import pathlib
 import time
 import zipfile
+import subprocess
 
 
 class InstallOption:
@@ -129,6 +130,12 @@ class Fomod:
                     self.write_line('<typeDescriptor>')
                     self.indent()
                     self.write_line('<type name="Recommended"/>')
+                    self.unindent()
+                    self.write_line('</typeDescriptor>')
+                else:
+                    self.write_line('<typeDescriptor>')
+                    self.indent()
+                    self.write_line('<type name="Optional"/>')
                     self.unindent()
                     self.write_line('</typeDescriptor>')
 
@@ -346,17 +353,29 @@ def main():
 
     fomod.write_file()
     module_config_xml.close()
+    zip_path_7z = mod_name + '_' + mod_version + '.7z'
+    zip_path_zip = mod_name + '_' + mod_version + '.zip'
+    zip_path_7z = os.path.join(os.getcwd(), zip_path_7z)
 
-    zip_path = mod_name + '_' + mod_version + '.zip'
+    try:
+        result = subprocess.run('7z i', stdout=subprocess.PIPE)
+    except FileNotFoundError:
+        result = ''
 
-    with zipfile.ZipFile(zip_path, 'w') as zip_file:
-        for root, dirs, files in os.walk(fomod_folder, topdown=False):
-            for name in files:
-                path = os.path.join(root, name)
-                rel_path = os.path.relpath(path, fomod_folder)
-                print(path)
-                print(rel_path)
-                zip_file.write(path, rel_path)
+    if '7z' in str(result.stdout):
+        cwd = os.getcwd()
+        os.chdir(os.path.join(cwd, 'fomod'))
+        subprocess.run('7z a "' + zip_path_7z + '" .\\* -mx')
+        os.chdir(cwd)
+    else:
+        with zipfile.ZipFile(zip_path_zip, 'w') as zip_file:
+            for root, dirs, files in os.walk(fomod_folder, topdown=False):
+                for name in files:
+                    path = os.path.join(root, name)
+                    rel_path = os.path.relpath(path, fomod_folder)
+                    print(path)
+                    print(rel_path)
+                    zip_file.write(path, rel_path)
 
 
 if __name__ == '__main__':
