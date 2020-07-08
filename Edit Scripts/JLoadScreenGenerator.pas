@@ -47,12 +47,24 @@ var
 	mainForm: TForm;
 
 
+procedure Trace(msg : String);
+begin
+	messageLog.add('['+TimeToStr(Time)+'] '+msg);	
+	messageLog.SaveToFile(editScriptsSubFolder+'\Log.txt');
+end;
+
+procedure Log(msg: String);
+begin
+	addmessage(msg);
+	Trace(msg);
+end;
+
 procedure ErrorMsg(msg : String);
 begin
 	error := True;
-	AddMessage('	');
-	AddMessage(msg);
-	AddMessage('	');
+	Log('	');
+	Log(msg);
+	Log('	');
 end;
 
 {
@@ -149,7 +161,6 @@ var
 	dividedProb, bestLoss, currentLoss : Real;
 	currentAttempt, bestAttempt, prevAttempt : TStringList;
 begin
-	Log('probability='+floattostr(probability));
 	dividedProb := Trunc(100.0 * Power(probability, 1.0 / num_approx)) / 100.0;
 
 	bestLoss := 1;
@@ -160,14 +171,12 @@ begin
 		currentAttempt.add(floattostr(dividedProb));
 	end;
 	currentLoss := ProbabilityLoss(probability, currentAttempt);
-	Log('currentLoss='+floattostr(currentLoss));
 	if currentLoss < bestLoss then begin
 		bestLoss := currentLoss;
 		bestAttempt := currentAttempt;
 	end;
 
 	for i:=0 to Pred(num_approx) do begin
-		Log('i='+inttostr(i));
 		prevAttempt := currentAttempt;
 		currentAttempt := TStringList.Create();
 		for j:=0 to Pred(num_approx) do begin
@@ -175,12 +184,7 @@ begin
 		end;
 		currentAttempt[i] := floattostr(strtofloat(currentAttempt[i]) + 0.01);
 
-		for j:=0 to Pred(num_approx) do begin
-			Log(currentAttempt[j]);
-		end;
-
 		currentLoss := ProbabilityLoss(probability, currentAttempt);
-		Log('currentLoss='+floattostr(currentLoss));
 		if currentLoss < bestLoss then begin
 			bestLoss := currentLoss;
 			bestAttempt := currentAttempt;
@@ -265,12 +269,6 @@ begin
 	Result := checkBox;
 end;
 
-procedure Log(msg: String);
-begin
-	addmessage(msg);
-	messageLog.add('['+TimeToStr(Time)+'] '+msg);	
-	messageLog.SaveToFile(editScriptsSubFolder+'\Log.txt');
-end;
 
 {
 	Deletes a group from a plugin file.
@@ -363,11 +361,7 @@ begin
 		if fileHandle <> esp then begin
 			if HasGroup(fileHandle, 'LSCR') then begin
 				group := GroupBySignature(fileHandle, 'LSCR');
-				//AddMasterIfMissing(esp, fileHandle);
-				//Log(GetFileName(fileHandle));
 				for j := 0 to  Pred(ElementCount(group)) do begin
-					//oldRecord := WinningOverride(ElementByIndex(group, j));
-					//AddMasterIfMissing(esp, GetFileName(GetFile(winningRecord)));
 					oldRecord := ElementByIndex(group, j);
 
 					AddMastersSmart(esp, oldRecord);
@@ -413,8 +407,6 @@ begin
 
 	prefix := ReadSetting(skPrefix);
 
-	Log('meshPath='+meshPath);
-
 	ClearGroup(esp, 'LSCR');
 	ClearGroup(esp, 'STAT');
 	CleanMasters(esp);
@@ -446,28 +438,14 @@ begin
 		Add(lscrRecord, 'XNAM', True);
 		SetValueInt(lscrRecord, 'XNAM\X', -45);
 
-		Log('Result');
 		Add(lscrRecord, 'Conditions', True);
 		for j:= 0 to Pred(approximationArray.Count()) do begin
-			Log(approximationArray[j]);
-
-			//Add(lscrRecord, 'Conditions', True);
 			ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
 			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
 			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
 			SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
 		end;
 		Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
-
-		{Log('probability = ' + floattostr(probability));
-		i1 := Round(100 * Power(probability, 1.0/4.0));
-		Log('i1 = ' + inttostr(i1));
-		r1 := Power(0.01 * i1, 4);
-		Log('approx probability = ' + floattostr(r1));}
-
-
-
-
 
 		if includeMessages then begin
 			SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
@@ -549,15 +527,6 @@ begin
 			VertexData := TriShape.Elements['Vertices'];
 			VertexPrefix := '';
 		end
-		
-
-		{Log('widthFactor='+floattostr(widthFactor));
-		Log('heightFactor='+floattostr(heightFactor));
-		Log('sourceUpperWidth='+floattostr(sourceUpperWidth));
-		Log('sourceLowerWidth='+floattostr(sourceLowerWidth));
-		Log('sourceHeight='+floattostr(sourceHeight));
-		Log('sourceOffsetX='+floattostr(sourceOffsetX));
-		Log('sourceOffsetY='+floattostr(sourceOffsetY));}
 
 		// Top Left
 		VertexData[0].NativeValues[VertexPrefix + 'X'] := sourceOffsetX - sourceUpperWidth * widthFactor;
@@ -652,9 +621,9 @@ begin
 
 	Log('	Creating textures from source images...');
 	for i:=0 to Pred(imageCount) do begin
-		Log('	' + inttostr(i+1) + '/' +  inttostr(imageCount));
 		// Ensure this the only file with this name
 		s := ChangeFileExt(ExtractFileName(sourcePathList[i]),'');
+		Log('	' + inttostr(i+1) + '/' +  inttostr(imageCount) + ': ' + s);
 		if not texturePathList.Find(s, tmp) then begin
 			texturePathList.Add(s);
 
@@ -784,7 +753,6 @@ end;
 
 procedure CreateESPOptions(pluginName, modFolder : String; disableOthers : Boolean; msgSetting : Integer; frequency : Integer );
 begin
- 	Log('modFolder='+modFolder);
 	if msgSetting = 0 then begin
 		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, false, frequency);
 	end else if msgSetting = 1 then begin
@@ -841,13 +809,12 @@ begin
 			templateNif.LoadFromFile(templatePath + '\TemplateLE.nif');
 		end;
 	except
-		Log('Error: Something went wrong when trying to load the template mesh.');
+		ErrorMsg('Error: Something went wrong when trying to load the template mesh.');
 	end;
 
 	// Create .nif files in mesh path
 	if advanced then begin
 		// loop through aspect ratios and create meshes in subfolder
-		Log(ReadSetting(skAspectRatios));
 
 		aspectRatioList := TStringList.Create();
 		aspectRatioList.Delimiter := ',';
@@ -858,7 +825,6 @@ begin
 		heightList := TStringList.Create();
 		try
 			for i:=0 to Pred(aspectRatioList.Count()) do begin
-				Log('aspectRatioList[i] = ' + aspectRatioList[i]);
 				sideList := TStringList.Create();
 				sideList.Delimiter := 'x';
 				sideList.StrictDelimiter := True;
@@ -886,9 +852,6 @@ begin
 
 	// Create .esp
 	if advanced then begin
-		Log(ReadSetting(skMessages));
-		
-
 		msgSetting := 1;
 		if ReadSetting(skMessages) = 'optional' then begin
 			msgSetting := 2;
@@ -913,19 +876,6 @@ begin
 	end;
 
 	if advanced then begin
-		{cmd := '/K "python "' + editScriptsSubFolder  + '\Python\create_fomod.py"' +
-		' --aspect-ratios ' + ReadSetting(skAspectRatios) + 
-		' --messages ' + ReadSetting(skMessages) + 
-		' --frequency '+ ReadSetting(skFrequencyOptions) + 
-		' --source "' + ReadSetting(skSourcePath) + '"' +
-		' --mod-folder "' + ReadSetting(skModFolder) + '"' +
-		' --mod-author "' + ReadSetting(skModAuthor) + '"' +
-		' --mod-name "' + ReadSetting(skModName) + '"' +
-		' --mod-version ' + ReadSetting(skModVersion) + 
-		' --data-path "' + ExcludeTrailingBackSlash(DataPath) + '"' +
-		' "';
-		Log(cmd);
-		ShellExecuteWait(0, nil, 'cmd.exe', cmd, '', SW_SHOW);}
 		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.cmd', DataPath + 'create_fomod.cmd', false);
 		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.py', DataPath + 'create_fomod.py' , false);
 		CopyFile(editScriptsSubFolder + '\settings.txt', DataPath + 'settings.txt' , false);
@@ -1031,7 +981,6 @@ begin
 		btnOk := AddButton(nil, 8, mainForm.Height - 64, 'OK', 1);
 		btnCancel := AddButton(btnOk, 80, 0, 'Cancel', 2);
 		modalResult := mainForm.ShowModal;
-		Log(inttostr(modalResult));
 		if modalResult = 1 then begin
 
 			WriteSetting(skAspectRatios, screenResolutionLine.Text);
