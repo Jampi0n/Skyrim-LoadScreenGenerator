@@ -420,6 +420,11 @@ begin
 	CleanMasters(esp);
 	Add(esp, 'LSCR', True);
 	Add(esp, 'STAT', True);
+
+	probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
+
+	approximationArray := CreateRandomProbability(probability, 4);
+
 	for i:=0 to Pred(imagePathArray.Count()) do begin
 		editorID := inttostr(i); //StringReplace(imagePathArray[i] ,' ', '_', [rfReplaceAll, rfIgnoreCase]);
 
@@ -440,10 +445,6 @@ begin
 		Add(lscrRecord, 'ONAM', True);
 		Add(lscrRecord, 'XNAM', True);
 		SetValueInt(lscrRecord, 'XNAM\X', -45);
-
-		probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
-
-		approximationArray := CreateRandomProbability(probability, 4);
 
 		Log('Result');
 		Add(lscrRecord, 'Conditions', True);
