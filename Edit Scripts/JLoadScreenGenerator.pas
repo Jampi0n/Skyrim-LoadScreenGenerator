@@ -15,6 +15,9 @@ unit _J_LoadScreenGenerator;
 const
 	version = '1.2.0';
 
+	defaultModFolder = 'JLoadScreens';
+	defaultPrefix = 'JLS_';
+	defaultPluginName = 'JLoadScreens.esp';
 	scriptName = 'JLoadScreens';
 	settingsName = 'Settings.txt';
 
@@ -385,12 +388,12 @@ end;
 {
 	Creates the esp plugin. Creates LSCR and STAT records for every new loading screen and disables other loading screens.
 }
-function CreateESP(fileName, meshPath : String; disableOthers, includeMessages : Boolean; frequency : Integer) : IwbFile;
+function CreateESP(fileName, meshPath, prefix : String; disableOthers, includeMessages : Boolean; frequency : Integer) : IwbFile;
 var
 	esp : IwbFile;
 	i, j : Integer;
-	lscrRecord, statRecord : IwbMainRecord;
-	editorID, prefix : String;
+	lscrRecord, statRecord, globRecord : IwbMainRecord;
+	editorID : String;
 	esl : Boolean;
 	probability : Real;
 	approximationArray : TStringList;
@@ -405,13 +408,17 @@ begin
 	esl := (wbAppName = 'SSE') and (imagePathArray.Count() < 1024);
 	SetElementNativeValues(ElementByIndex(esp, 0), 'Record Header\Record Flags\ESL', esl);
 
-	prefix := ReadSetting(skPrefix);
-
 	ClearGroup(esp, 'LSCR');
 	ClearGroup(esp, 'STAT');
+	ClearGroup(esp, 'GLOB');
 	CleanMasters(esp);
 	Add(esp, 'LSCR', True);
 	Add(esp, 'STAT', True);
+	if ReadSettingBool(skTestMode) then begin
+		Add(esp, 'GLOB', True);
+		globRecord := Add(GroupBySignature(esp, 'GLOB'), 'GLOB', True);
+		SetEditorID(globRecord , prefix +'TestMode');
+	end;
 
 	probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
 
@@ -439,13 +446,20 @@ begin
 		SetValueInt(lscrRecord, 'XNAM\X', -45);
 
 		Add(lscrRecord, 'Conditions', True);
-		for j:= 0 to Pred(approximationArray.Count()) do begin
-			ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
-			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
-			SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
-			SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
+		if ReadSettingBool(skTestMode) then begin
+			SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Type', 10000000);
+			SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', i);
+			SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetGlobalValue');
+			SetLinksTo(lscrRecord, 'Conditions\[0]\CTDA\Global', globRecord);
+		end else begin
+			for j:= 0 to Pred(approximationArray.Count()) do begin
+				ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
+				SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
+				SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
+				SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
+			end;
+			Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
 		end;
-		Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
 
 		if includeMessages then begin
 			SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
@@ -754,12 +768,12 @@ end;
 procedure CreateESPOptions(pluginName, modFolder : String; disableOthers : Boolean; msgSetting : Integer; frequency : Integer );
 begin
 	if msgSetting = 0 then begin
-		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, false, frequency);
+		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, ReadSetting(skPrefix), disableOthers, false, frequency);
 	end else if msgSetting = 1 then begin
-		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, true, frequency);
+		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, ReadSetting(skPrefix), disableOthers, true, frequency);
 	end else if msgSetting = 2 then begin
-		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, false, frequency);
-		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, disableOthers, true, frequency);
+		CreateESP('FOMOD_M0_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, ReadSetting(skPrefix), disableOthers, false, frequency);
+		CreateESP('FOMOD_M1_P' + inttostr(frequency) + '_FOMODEND_' + pluginName, modFolder, ReadSetting(skPrefix), disableOthers, true, frequency);
 	end
 end;
 
@@ -863,16 +877,15 @@ begin
 			msgSetting := 1;
 			Log('The messages option ' + ReadSetting(skMessages) + ' is invalid; "always" will be used instead.');
 		end;
-			frequencyList := TStringList.Create();
-			frequencyList.Delimiter := ',';
-			frequencyList.StrictDelimiter := True;
-			frequencyList.DelimitedText   := ReadSetting(skFrequencyList);
-			for i:=0 to Pred(frequencyList.Count()) do begin
-				CreateESPOptions(pluginName, ReadSetting(skModFolder), disableOthers, msgSetting, strtoint(frequencyList[i]));
-			end;
-
+		frequencyList := TStringList.Create();
+		frequencyList.Delimiter := ',';
+		frequencyList.StrictDelimiter := True;
+		frequencyList.DelimitedText   := ReadSetting(skFrequencyList);
+		for i:=0 to Pred(frequencyList.Count()) do begin
+			CreateESPOptions(pluginName, ReadSetting(skModFolder), disableOthers, msgSetting, strtoint(frequencyList[i]));
+		end;
 	end else begin
-		CreateESP(pluginName, ReadSetting(skModFolder), disableOthers, true, ReadSettingInt(skFrequency));
+		CreateESP(defaultPluginName, defaultModFolder, defaultPrefix, disableOthers, true, ReadSettingInt(skFrequency));
 	end;
 
 	if advanced then begin
