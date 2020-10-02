@@ -398,75 +398,81 @@ var
 	probability : Real;
 	approximationArray : TStringList;
 begin
+	Log('	Creating plugin file "' + fileName + '"');
+
+	esl := (wbAppName = 'SSE') and (imagePathArray.Count() < 1024);
 	esp := FileByName(fileName);
 	if not Assigned(esp) then begin
-		esp := AddNewFileName(fileName, false);
+		esp := AddNewFileName(fileName, esl);
 	end;
 	SetValueString(ElementByIndex(esp, 0), 'CNAM - Author', 'Jampion');
 	SetValueInt(ElementByIndex(esp, 0), 'HEDR - Header\Next Object ID', 2048);
 
-	esl := (wbAppName = 'SSE') and (imagePathArray.Count() < 1024);
 	SetElementNativeValues(ElementByIndex(esp, 0), 'Record Header\Record Flags\ESL', esl);
 
-	ClearGroup(esp, 'LSCR');
-	ClearGroup(esp, 'STAT');
-	ClearGroup(esp, 'GLOB');
-	CleanMasters(esp);
-	Add(esp, 'LSCR', True);
-	Add(esp, 'STAT', True);
-	if ReadSettingBool(skTestMode) then begin
-		Add(esp, 'GLOB', True);
-		globRecord := Add(GroupBySignature(esp, 'GLOB'), 'GLOB', True);
-		SetEditorID(globRecord , prefix +'TestMode');
-	end;
-
-	probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
-
-	approximationArray := CreateRandomProbability(probability, 4);
-
-	for i:=0 to Pred(imagePathArray.Count()) do begin
-		editorID := inttostr(i); //StringReplace(imagePathArray[i] ,' ', '_', [rfReplaceAll, rfIgnoreCase]);
-
-		statRecord := Add(GroupBySignature(esp, 'STAT'), 'STAT', True);
-		SetEditorID(statRecord , prefix +'STAT_' + editorID);
-
-		Add(statRecord, 'MODL', True);
-		SetValueString(statRecord, 'Model\MODL - Model FileName', meshPath + '\' + imagePathArray[i] + '.nif');
-		SetValueInt(statRecord, 'DNAM\Max Angle (30-120)', 90);
-
-		lscrRecord := Add(GroupBySignature(esp, 'LSCR'), 'LSCR', True);
-		SetEditorID(lscrRecord, prefix + 'LSCR_' + editorID);
-		SetLinksTo(lscrRecord, 'NNAM', statRecord);
-		Add(lscrRecord, 'SNAM', True);
-		SetValueInt(lscrRecord, 'SNAM', 2);
-		Add(lscrRecord, 'RNAM', True);
-		SetValueInt(lscrRecord, 'RNAM\X', -90);
-		Add(lscrRecord, 'ONAM', True);
-		Add(lscrRecord, 'XNAM', True);
-		SetValueInt(lscrRecord, 'XNAM\X', -45);
-
-		Add(lscrRecord, 'Conditions', True);
+	if not Assigned(esp) then begin
+		ErrorMsg('The plugin file could not be created.');
+	end else begin
+		ClearGroup(esp, 'LSCR');
+		ClearGroup(esp, 'STAT');
+		ClearGroup(esp, 'GLOB');
+		CleanMasters(esp);
+		Add(esp, 'LSCR', True);
+		Add(esp, 'STAT', True);
 		if ReadSettingBool(skTestMode) then begin
-			SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Type', 10000000);
-			SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', i);
-			SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetGlobalValue');
-			SetLinksTo(lscrRecord, 'Conditions\[0]\CTDA\Global', globRecord);
-		end else begin
-			for j:= 0 to Pred(approximationArray.Count()) do begin
-				ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
-				SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
-				SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
-				SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
-			end;
-			Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
+			Add(esp, 'GLOB', True);
+			globRecord := Add(GroupBySignature(esp, 'GLOB'), 'GLOB', True);
+			SetEditorID(globRecord , prefix +'TestMode');
 		end;
 
-		if includeMessages then begin
-			SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
+		probability := 1.0 - Power(1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
+
+		approximationArray := CreateRandomProbability(probability, 4);
+
+		for i:=0 to Pred(imagePathArray.Count()) do begin
+			editorID := inttostr(i); //StringReplace(imagePathArray[i] ,' ', '_', [rfReplaceAll, rfIgnoreCase]);
+
+			statRecord := Add(GroupBySignature(esp, 'STAT'), 'STAT', True);
+			SetEditorID(statRecord , prefix +'STAT_' + editorID);
+
+			Add(statRecord, 'MODL', True);
+			SetValueString(statRecord, 'Model\MODL - Model FileName', meshPath + '\' + imagePathArray[i] + '.nif');
+			SetValueInt(statRecord, 'DNAM\Max Angle (30-120)', 90);
+
+			lscrRecord := Add(GroupBySignature(esp, 'LSCR'), 'LSCR', True);
+			SetEditorID(lscrRecord, prefix + 'LSCR_' + editorID);
+			SetLinksTo(lscrRecord, 'NNAM', statRecord);
+			Add(lscrRecord, 'SNAM', True);
+			SetValueInt(lscrRecord, 'SNAM', 2);
+			Add(lscrRecord, 'RNAM', True);
+			SetValueInt(lscrRecord, 'RNAM\X', -90);
+			Add(lscrRecord, 'ONAM', True);
+			Add(lscrRecord, 'XNAM', True);
+			SetValueInt(lscrRecord, 'XNAM\X', -45);
+
+			Add(lscrRecord, 'Conditions', True);
+			if ReadSettingBool(skTestMode) then begin
+				SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Type', 10000000);
+				SetValueInt(lscrRecord, 'Conditions\[0]\CTDA\Comparison Value', i);
+				SetValueString(lscrRecord, 'Conditions\[0]\CTDA\Function', 'GetGlobalValue');
+				SetLinksTo(lscrRecord, 'Conditions\[0]\CTDA\Global', globRecord);
+			end else begin
+				for j:= 0 to Pred(approximationArray.Count()) do begin
+					ElementAssign(ElementByPath(lscrRecord, 'Conditions'), HighInteger, nil, false);
+					SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Type', 10100000);
+					SetValueInt(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Comparison Value', Trunc(100 * strtofloat(approximationArray[j]))-1);
+					SetValueString(lscrRecord, 'Conditions\[' + inttostr(j)+ ']\CTDA\Function', 'GetRandomPercent');
+				end;
+				Remove(ElementByPath(lscrRecord, 'Conditions\[' + inttostr(approximationArray.Count())+ ']'));
+			end;
+
+			if includeMessages then begin
+				SetValueString(lscrRecord, 'DESC - Description', imageTextArray[i]);
+			end;
 		end;
-	end;
-	if disableOthers then begin
-		PatchLoadingScreens(esp);
+		if disableOthers then begin
+			PatchLoadingScreens(esp);
+		end;
 	end;
 end;
 
@@ -525,6 +531,7 @@ var
 	VertexPrefix : String;
 begin
 	for i:=0 to Pred(imagePathArray.Count()) do begin
+		Log('	' + inttostr(i+1) + '/' +  inttostr(imagePathArray.Count()) + ': ' + targetPath + '\' + imagePathArray[i] + '.nif');
 		if sse then TextureSet := templateNif.Blocks[3] else TextureSet := templateNif.Blocks[4];
 		Textures := TextureSet.Elements['Textures'];
 		Textures[0].EditValue := texturePath + '\' + imagePathArray[i] + '.dds';
@@ -760,8 +767,6 @@ begin
 		Log('	');
 	end;
 	totalLoadScreens := imagePathArray.Count();
-	Log('	Creating loading screens for ' + inttostr(totalLoadScreens) + ' images...');
-	Log('	');
 end;
 
 
@@ -787,6 +792,11 @@ var
 	aspectRatioList, sideList, widthList, heightList, frequencyList : TStringList;
 	i, msgSetting : Integer;
 begin
+	if advanced then begin
+		Log('	Running advanved generator...');
+	end else begin
+		Log('	Running basic generator...');
+	end;
 	Log('	Using source path: ' + sourcePath);
 	templatePath := editScriptsSubFolder;
 
@@ -813,6 +823,8 @@ begin
 
 	// Create .dds files in texture path
 	ProcessTextures(sourcePath, texturePath, recursive);
+	Log('	Using ' + inttostr(totalLoadScreens) + ' images for loading screen generation.');
+	Log('	');
 
 	// Load template mesh
 	templateNif := TwbNifFile.Create;
@@ -827,6 +839,7 @@ begin
 	end;
 
 	// Create .nif files in mesh path
+	Log('	Creating loading screen meshes...');
 	if advanced then begin
 		// loop through aspect ratios and create meshes in subfolder
 
@@ -855,16 +868,16 @@ begin
 			end;
 		end;
 		for i:=0 to Pred(aspectRatioList.Count()) do begin
+			Log('	Creating loading screen meshes for aspect ratio: ' + aspectRatioList[i]);
 			forcedirectories(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder));
 			CreateMeshes(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder), texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', strtofloat(widthList[i]) / strtofloat(heightList[i]) );
 		end;
-
-
 	end else begin
 		CreateMeshes(meshPath, texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', ReadSettingInt(skDisplayWidth) / ReadSettingInt(skDisplayHeight));
 	end;
 
 	// Create .esp
+	Log('	Creating plugin files...');
 	if advanced then begin
 		msgSetting := 1;
 		if ReadSetting(skMessages) = 'optional' then begin
@@ -889,10 +902,12 @@ begin
 	end;
 
 	if advanced then begin
+		Log('	Copying build files...');
 		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.cmd', DataPath + 'create_fomod.cmd', false);
 		CopyFile(editScriptsSubFolder + '\Custom\create_fomod.py', DataPath + 'create_fomod.py' , false);
 		CopyFile(editScriptsSubFolder + '\settings.txt', DataPath + 'settings.txt' , false);
 	end;
+	Log('	Done'); 
 end;
 
 {
@@ -1244,7 +1259,14 @@ begin
 	
 	Log('	');
 	Log('	Running JLoadScreenGenerator ' + version);
-	UI();
+	try
+		UI();
+	except
+		on E : Exception do begin
+			Log('Error while running ' + scriptName);
+			Log(E.ClassName + ' error raised, with message : ' + E.Message);
+		end;
+	end;
 end;
 
 function Finalize: Integer;
