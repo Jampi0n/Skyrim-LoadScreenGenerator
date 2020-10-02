@@ -38,7 +38,7 @@ var
 	settingKey, totalLoadScreens : Integer;
 	heightFactor, widthFactor : Real;
 
-	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, sk4K : Integer;
+	skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight, skFrequency, skGamma, skContrast, skBrightness, skSaturation, skBorderOptions, skResolution : Integer;
 	skModName, skModVersion, skModFolder, skPluginName, skModAuthor, skPrefix, skModLink, skTestMode, skAspectRatios, skTextureResolutions, skMessages, skFrequencyList, skDefaultFrequency : Integer;
 
 	gamma, blackPoint, whitePoint, brightness, saturation : Real;
@@ -480,9 +480,10 @@ end;
 	Calculates width and height factors for given display and image ratios.
 	Sets widthFactor and heightFactor.
 }
-procedure FitToDisplayRatio(displayRatio, imageRatio : Real; stretch : Boolean);
+procedure FitToDisplayRatio(displayRatio, imageRatio : Real);
 var
 	ratioFactor, width, height : Real;
+	borderOption : String;
 begin
 	// In the first part, the factors are adjusted, so the model fills the entire screen.
 	// A width of 1.0 means the entire width of the image is visible on the screen, so width stays at 1.
@@ -496,19 +497,27 @@ begin
 	// In order to keep the aspect ratio of the image, the model must be modified.
 	// Here, the model only becomes smaller, in order to add black bars.
 
-	if not stretch then begin
-		// If the display is wider than the image, black bars on the left and right are required.
-		// This is achieved by reducing the width of the model.
-		if displayRatio > imageRatio then begin
-			width := width * imageRatio / displayRatio;
-		end;
+	borderOption := ReadSetting(skBorderOptions);
 
-		// If the image is wider than the display, black bars on the top and bottom are required.
-		// This is achieved by reducing the height of the model.
-		if displayRatio < imageRatio then begin
-			if ReadSettingBool(skFullHeight) then begin
+	if borderOption <> 'stretch' then begin
+		if displayRatio > imageRatio then begin
+			if borderOption = 'fullwidth'  then begin
+				height := height * displayRatio / imageRatio;
+			end else if borderOption = 'fullheight' then begin
 				width := width * imageRatio / displayRatio;
-			end else begin
+			end else if borderOption = 'crop' then begin
+				height := height * displayRatio / imageRatio;
+			end else if borderOption = 'black' then begin
+				width := width * imageRatio / displayRatio;
+			end;
+		end else if displayRatio < imageRatio then begin
+			if borderOption = 'fullwidth'  then begin
+				height := height * displayRatio / imageRatio;
+			end else if borderOption = 'fullheight' then begin
+				width := width * imageRatio / displayRatio;
+			end else if borderOption = 'crop' then begin
+				width := width * imageRatio / displayRatio;
+			end else if borderOption = 'black' then begin
 				height := height * displayRatio / imageRatio;
 			end;
 		end;
@@ -523,7 +532,7 @@ end;
 	Create meshes based on a template.
 	Set texture and vertex positions according to image and screen resolution.
 }
-procedure CreateMeshes(targetPath, texturePath : string; templateNif : TwbNifFile; stretch, sse : Boolean; displayRatio : Real);
+procedure CreateMeshes(targetPath, texturePath : string; templateNif : TwbNifFile; sse : Boolean; displayRatio : Real);
 var
 	i, j, vertices : integer;
 	Textures, VertexData: TdfElement;
@@ -536,7 +545,7 @@ begin
 		Textures := TextureSet.Elements['Textures'];
 		Textures[0].EditValue := texturePath + '\' + imagePathArray[i] + '.dds';
 
-		FitToDisplayRatio(displayRatio, strtofloat(imageWidthArray[i])/strtofloat(imageHeightArray[i]), stretch);
+		FitToDisplayRatio(displayRatio, strtofloat(imageWidthArray[i])/strtofloat(imageHeightArray[i]));
 		if sse then begin
 			TriShape := templateNif.Blocks[1];
 			vertices := TriShape.NativeValues['Num Vertices'];
@@ -609,7 +618,7 @@ var
 	sourceFiles: TStringDynArray;
 	sourcePathList, texturePathList, readTextFile, ignoredFiles : TStringList;
 	i, j, imageCount, tmp: integer;
-	cmd, s, textFile, srgbCmd : string;
+	cmd, s, textFile, srgbCmd, resolution : string;
 	Nif: TwbNifFile;
 	srgb : Boolean;
 begin
@@ -639,6 +648,8 @@ begin
 	ignoredFiles := TStringList.Create;
 	ignoredFiles.Sorted := True;
 	ignoredFiles.Duplicates := dupIgnore;
+
+	resolution := inttostr(ReadSettingInt(skResolution));
 
 	Log('	Creating textures from source images...');
 	for i:=0 to Pred(imageCount) do begin
@@ -677,9 +688,9 @@ begin
 
 			try
 				// Execute texconv.exe (timeout = 10 seconds)
-				cmd := ' -m 1 -f BC1_UNORM ' + srgbCmd + '-o "' + targetPath + '" -y -w 2048 -h 2048 "' + sourcePathList[i] + '"';
+				cmd := ' -m 1 -f BC1_UNORM ' + srgbCmd + '-o "' + targetPath + '" -y -w ' + resolution + ' -h '+resolution+' "' + sourcePathList[i] + '"';
 				CreateProcessWait(ScriptsPath + 'Texconv.exe', cmd, SW_HIDE, 10000);
-				cmd := ' -f BC1_UNORM ' + '-o "' + targetPath + '" -y -w 2048 -h 2048 "' + targetPath + '\' + s + '.dds' + ' "';
+				cmd := ' -f BC1_UNORM ' + '-o "' + targetPath + '" -y -w '+resolution+' -h '+resolution+' "' + targetPath + '\' + s + '.dds' + ' "';
 				CreateProcessWait(ScriptsPath + 'Texconv.exe', cmd, SW_HIDE, 10000);
 			except
 				on E : Exception do begin
@@ -870,10 +881,10 @@ begin
 		for i:=0 to Pred(aspectRatioList.Count()) do begin
 			Log('	Creating loading screen meshes for aspect ratio: ' + aspectRatioList[i]);
 			forcedirectories(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder));
-			CreateMeshes(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder), texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', strtofloat(widthList[i]) / strtofloat(heightList[i]) );
+			CreateMeshes(DataPath + 'meshes\' + aspectRatioList[i] + '\' +  ReadSetting(skModFolder), texturePathShort, templateNif, wbAppName = 'SSE', strtofloat(widthList[i]) / strtofloat(heightList[i]) );
 		end;
 	end else begin
-		CreateMeshes(meshPath, texturePathShort, templateNif, ReadSettingBool(skStretch), wbAppName = 'SSE', ReadSettingInt(skDisplayWidth) / ReadSettingInt(skDisplayHeight));
+		CreateMeshes(meshPath, texturePathShort, templateNif, wbAppName = 'SSE', ReadSettingInt(skDisplayWidth) / ReadSettingInt(skDisplayHeight));
 	end;
 
 	// Create .esp
@@ -1043,13 +1054,14 @@ end;
 }
 function UI: Integer;
 var
-  	selectDirLabel, screenResolutionLabel, colonLabel, frequencyLabel, imageAdjustmentLabel, gammaLabel, contrastLabel, brightnessLabel, saturationLabel: TLabel;
+  	selectDirLabel, screenResolutionLabel, colonLabel, frequencyLabel, imageAdjustmentLabel, gammaLabel, contrastLabel, brightnessLabel, saturationLabel, borderLabel: TLabel;
 	screenResolutionBox, selectDirBox, optionsBox, imageAdjustmentBox : TGroupBox;
-	selectDirLine, widthLine, heightLine, gammaLine, contrastLine, brightnessLine, saturationLine, frequencyLine : TEdit;
-	checkBoxDisableOthers, checkBoxStretch, checkBoxSubDirs, checkBoxTestMode, checkBoxFullHeight : TCheckBox;
+	selectDirLine, widthLine, heightLine, gammaLine, contrastLine, brightnessLine, saturationLine, frequencyLine, borderLine : TEdit;
+	checkBoxDisableOthers, checkBoxSubDirs, checkBoxTestMode : TCheckBox;
 	btnOk, btnCancel, btnAdvanced: TButton;
 	tmpInt, modalResult : Integer;
 	tmpReal : Real;
+	tmpStr : Str;
 begin
 	mainForm := TForm.Create(nil);
 	try
@@ -1078,12 +1090,15 @@ begin
 		optionsBox := AddBox(screenResolutionBox, 0, screenResolutionBox.Height + 8, mainForm.Width-24, 128, 'Options');
 
 		checkBoxDisableOthers := AddCheckBox(optionsBox, 8, 16, ReadSettingBool(skDisableOtherLoadScreens), 'Disable other Loading Screens', 'Prevents other loading screens (other mods and vanilla) from showing.');
-		checkBoxStretch := AddCheckBox(checkBoxDisableOthers, 0, 16, ReadSettingBool(skStretch), 'Stretch images to fill the entire screen', 'Stretches images, if their aspect ratio differs from the target aspect ratio.');
-		checkBoxFullHeight := AddCheckBox(checkBoxStretch, 0, 16, ReadSettingBool(skFullHeight), 'Force full height', 'There are no black bars at the top and bottom. Wider pictures will be cropped at the sides.');
-		checkBoxSubDirs := AddCheckBox(checkBoxFullHeight, 0, 16, ReadSettingBool(skRecursive), 'Include subdirectories', 'Includes subdirectories of the source directory, when searching for images.');
+
+		checkBoxSubDirs := AddCheckBox(checkBoxDisableOthers, 0, 16, ReadSettingBool(skRecursive), 'Include subdirectories', 'Includes subdirectories of the source directory, when searching for images.');
 		checkBoxTestMode := AddCheckBox(checkBoxSubDirs, 0, 16, ReadSettingBool(skTestMode), 'Test Mode', 'Adds a global variable, which can be used to force specific loading screens.');
 		frequencyLabel := AddLabel(checkBoxTestMode, 0, 24, 64, 24, 'Frequency:');
 		frequencyLine := AddLine(frequencyLabel, 64, -4, 64, ReadSetting(skFrequency), 'Loading screen frequency: 0 - 100');
+
+		borderLabel := AddLabel(frequencyLabel, 0, 24, 64, 24, 'Border Options:');
+		borderLine := AddLine(borderLabel, 96, -4, 128, ReadSetting(skBorderOptions), 'black,crop,stretch,fullheight,fullwidth');
+
 
 		imageAdjustmentBox := TGroupBox.Create(mainForm);
 		imageAdjustmentBox.Parent := mainForm;
@@ -1129,9 +1144,15 @@ begin
 
 
 			WriteSetting(skDisableOtherLoadScreens, checkBoxDisableOthers.Checked);
-			WriteSetting(skStretch, checkBoxStretch.Checked);
 			WriteSetting(skRecursive, checkBoxSubDirs.Checked);
-			WriteSetting(skFullHeight, checkBoxFullHeight.Checked);
+
+			tmpStr := borderLine.Text;
+			if (tmpStr = 'black') or (tmpStr = 'crop') or (tmpStr = 'fullheight') or (tmpStr = 'fullwidth') or (tmpStr = 'stretch') then begin
+				WriteSetting(skBorderOptions, tmpStr);
+			end else begin
+				ErrorMsg('Border option <' + tmpStr + '> is unknown.');
+			end;
+
 			WriteSetting(skTestMode, checkBoxTestMode.Checked);
 			
 			tmpInt := strtoint(frequencyLine.Text);
@@ -1246,6 +1267,9 @@ begin
 	skDefaultFrequency := GetSettingKey('15');
 
 	skModLink := GetSettingKey('https://www.nexusmods.com/skyrimspecialedition/mods/36556');
+
+	skBorderOptions := GetSettingKey('black');
+	skResolution := GetSettingKey('2048');
 
 end;
 
