@@ -1,4 +1,4 @@
-Requires [https://github.com/Jampi0n/xEdit-Script-Transpiler](CLikeToDelphi). Set the environment variable `CLikeToDelphi` to point to CLikeToDelphi.py.
+Requires [https://github.com/Jampi0n/Skyrim-CLikeToDelphi](CLikeToDelphi). Set the environment variable `CLikeToDelphi` to point to CLikeToDelphi.py.
 
 The default build task of VSCode runs `build.cmd`, which places the generated delphi scripts in the edit scripts folder of xEdit. Set the environment variables `TEVSEDIT_PATH` and `SSEEDIT_PATH` to point towards the installation directories of TESVEdit and SSEEdit.
 
