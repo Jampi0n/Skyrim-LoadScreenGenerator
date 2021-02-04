@@ -668,27 +668,30 @@ begin
     end;
 end;
 
-function LoadTemplateNif() : TwbNifFile;
+function LoadTemplateNif(templatePath : String) : TwbNifFile;
 var
     templateNif : TwbNifFile;
+    fullPath : String;
 begin
     templateNif := TwbNifFile.Create;
+    fullPath := templatePath;
+    if wbAppName = 'SSE' then begin
+        fullPath := fullPath+'\TemplateSSE.nif';
+    end else begin 
+        fullPath := fullPath+'\TemplateLE.nif';
+    end;
     try 
-        if wbAppName = 'SSE' then begin
-            templateNif.LoadFromFile(templatePath + '\TemplateSSE.nif');
-        end else begin 
-            templateNif.LoadFromFile(templatePath + '\TemplateLE.nif');
-        end;
+        templateNif.LoadFromFile(fullPath);
     except
         on E : Exception do begin
-            ErrorMsg('Error: Something went wrong when trying to load the template mesh.');
+            ErrorMsg('Error: Something went wrong when trying to load the template mesh. Path: ' + fullPath);
         end;
     end;
     Result := templateNif;
     exit;
 end;
 
-procedure MeshGen(advanced : Boolean; texturePathShort : String);
+procedure MeshGen(advanced : Boolean; texturePathShort : String; templatePath : String);
 var
     templateNif : TwbNifFile;
     aspectRatioList : TStringList;
@@ -699,7 +702,7 @@ var
     meshPath : String;
 begin
     Log('	Creating loading screen meshes...');
-    templateNif := LoadTemplateNif();
+    templateNif := LoadTemplateNif(templatePath);
     if advanced then begin
         aspectRatioList := TStringList.Create();
         aspectRatioList.Delimiter := ',';
@@ -944,7 +947,7 @@ begin
     ProcessTextures(sourcePath,texturePath,recursive);
     Log('  Using ' + inttostr(totalLoadScreens) + ' images for loading screen generation.');
     Log('	');
-    MeshGen(advanced,texturePathShort);
+    MeshGen(advanced,texturePathShort,templatePath);
     PluginGen(advanced,disableOthers,pluginName);
     if advanced then begin
         Log('	Copying build files...');

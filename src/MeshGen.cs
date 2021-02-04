@@ -98,23 +98,25 @@ void CreateMeshes (string targetPath, string texturePath, TwbNifFile templateNif
     }
 }
 
-TwbNifFile LoadTemplateNif () {
+TwbNifFile LoadTemplateNif (string templatePath) {
     TwbNifFile templateNif = TwbNifFile.Create;
+    string fullPath = templatePath;
+    if (wbAppName == "SSE") {
+        fullPath += "\\TemplateSSE.nif";
+    } else {
+        fullPath += "\\TemplateLE.nif";
+    }
     try {
-        if (wbAppName == "SSE") {
-            templateNif.LoadFromFile (templatePath + "\\TemplateSSE.nif");
-        } else {
-            templateNif.LoadFromFile (templatePath + "\\TemplateLE.nif");
-        }
+        templateNif.LoadFromFile (fullPath);
     } catch (Exception E) {
-        ErrorMsg ("Error: Something went wrong when trying to load the template mesh.");
+        ErrorMsg ("Error: Something went wrong when trying to load the template mesh. Path: " + fullPath);
     }
     return templateNif;
 }
 
-void MeshGen(bool advanced, string texturePathShort) {
+void MeshGen (bool advanced, string texturePathShort, string templatePath) {
     Log ("	Creating loading screen meshes...");
-    TwbNifFile templateNif = LoadTemplateNif ();
+    TwbNifFile templateNif = LoadTemplateNif (templatePath);
     if (advanced) {
         // loop through aspect ratios and create meshes in subfolder
         TStringList aspectRatioList = TStringList.Create ();

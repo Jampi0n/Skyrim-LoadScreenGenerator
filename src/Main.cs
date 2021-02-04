@@ -39,9 +39,6 @@ TStringList imagePathArray, imageWidthArray, imageHeightArray, imageTextArray;
 bool error = false;
 TForm mainForm;
 
-
-
-
 void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced) {
     if (advanced) {
         Log ("	Running advanved generator...");
@@ -69,10 +66,10 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
     Log ("	");
 
     // Create .nif files in mesh path
-    MeshGen(advanced, texturePathShort);
+    MeshGen (advanced, texturePathShort, templatePath);
 
     // Create .esp
-    PluginGen(advanced, disableOthers, pluginName);
+    PluginGen (advanced, disableOthers, pluginName);
 
     if (advanced) {
         Log ("	Copying build files...");
@@ -225,7 +222,6 @@ int UI () {
         TLabel borderLabel = AddLabel (frequencyLabel, 0, 24, 64, 24, "Border Options:");
         TEdit borderLine = AddLine (borderLabel, 80, -4, 96, ReadSetting (skBorderOptions), "black,crop,stretch,fullheight,fullwidth");
 
-
         TLabel resolutionLabel = AddLabel (optionsBox, 224, 18, 64, 24, "Texture Resolution:");
         TEdit resolutionLine = AddLine (resolutionLabel, 96, -4, 48, ReadSetting (skResolution), "Texture Resolution: e.g 1024, 2048, 4096");
 
@@ -278,13 +274,12 @@ int UI () {
                 ErrorMsg ("Height must be positive number.");
             }
 
-            tmpInt = strtoint(resolutionLine.Text);
+            tmpInt = strtoint (resolutionLine.Text);
             if (tmpInt > 0) {
                 WriteSetting (skResolution, tmpInt);
             } else {
                 ErrorMsg ("Resolution must be positive number.");
             }
-            
 
             WriteSetting (skDisableOtherLoadScreens, checkBoxDisableOthers.Checked);
             WriteSetting (skRecursive, checkBoxSubDirs.Checked);
