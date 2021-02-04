@@ -1,5 +1,11 @@
+@echo off
 python %CLikeToDelphi% "src\main.cs" "Edit Scripts\JLoadScreenGenerator.pas"
-robocopy "%~dp0Custom" "%~dp0Edit Scripts\JLoadScreens\Custom" *.py /s /xx
-robocopy "%~dp0Custom" "%~dp0Edit Scripts\JLoadScreens\Custom" *.cmd /s /xx
-robocopy "%~dp0Edit Scripts" "%SSEEDIT_PATH%\Edit Scripts" /s /xx
-robocopy "%~dp0Edit Scripts" "%TESVEDIT_PATH%\Edit Scripts" /s /xx
+if errorlevel 1 (
+echo Build failed.
+) else (
+robocopy "%~dp0Custom" "%~dp0Edit Scripts\JLoadScreens\Custom" *.py /s /xx > nul
+robocopy "%~dp0Custom" "%~dp0Edit Scripts\JLoadScreens\Custom" *.cmd /s /xx > nul
+robocopy "%~dp0Edit Scripts" "%SSEEDIT_PATH%\Edit Scripts" /s /xx > nul
+robocopy "%~dp0Edit Scripts" "%TESVEDIT_PATH%\Edit Scripts" /s /xx > nul
+echo Build successful.
+)
