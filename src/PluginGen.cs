@@ -1,7 +1,7 @@
 void PatchLoadingScreens (IwbFile esp) {
     for (int i = 0; i < FileCount; i += 1) {
         IwbFile fileHandle = FileByIndex (i);
-        if (fileHandle != esp) {
+        if ((fileHandle != esp) && (!StartsText ("FOMOD_M", GetFileName (fileHandle)))) {
             if (HasGroup (fileHandle, "LSCR")) {
                 IwbGroupRecord group = GroupBySignature (fileHandle, "LSCR");
                 for (int j = 0; j < ElementCount (group); j += 1) {
@@ -116,8 +116,7 @@ void CreateESPOptions (string pluginName, string modFolder, bool disableOthers, 
     }
 }
 
-
-void PluginGen(bool advanced, bool disableOthers, string pluginName) {
+void PluginGen (bool advanced, bool disableOthers, string pluginName) {
     Log ("	Creating plugin files...");
     if (advanced) {
         int msgSetting = 1;
@@ -142,5 +141,3 @@ void PluginGen(bool advanced, bool disableOthers, string pluginName) {
         CreateESP (defaultPluginName, defaultModFolder, defaultPrefix, disableOthers, true, ReadSettingInt (skFrequency));
     }
 }
-
-
