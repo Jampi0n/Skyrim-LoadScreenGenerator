@@ -21,7 +21,7 @@ float ProbabilityLoss (float probability, TStringList approximationArray) {
 TStringList CreateRandomProbability (float probability, int num_approx) {
     float dividedProb = Trunc (100.0 * Power (probability, 1.0 / num_approx)) / 100.0;
 
-    float bestLoss = 1.0;
+    float bestLoss = -1.0;
     TStringList bestAttempt = nil;
     TStringList prevAttempt;
 
@@ -30,7 +30,7 @@ TStringList CreateRandomProbability (float probability, int num_approx) {
         currentAttempt.add (floattostr (dividedProb));
     }
     float currentLoss = ProbabilityLoss (probability, currentAttempt);
-    if (currentLoss < bestLoss) {
+    if ((currentLoss < bestLoss) || (bestLoss < -0.5)) {
         bestLoss = currentLoss;
         bestAttempt = currentAttempt;
     }
