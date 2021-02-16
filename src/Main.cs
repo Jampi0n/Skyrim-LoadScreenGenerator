@@ -22,7 +22,7 @@
 // import ./MeshGen.cs
 // import ./TextureGen.cs
 
-const string version = "1.2.0";
+const string version = "1.3.0";
 const string defaultModFolder = "JLoadScreens";
 const string defaultPrefix = "JLS_";
 const string defaultPluginName = "JLoadScreens.esp";
@@ -76,6 +76,11 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
         CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.cmd", DataPath + "create_fomod.cmd", false);
         CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.py", DataPath + "create_fomod.py", false);
         CopyFile (editScriptsSubFolder + "\\settings.txt", DataPath + "settings.txt", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\black.png", DataPath + "black.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\crop.png", DataPath + "crop.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\stretch.png", DataPath + "stretch.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullwidth.png", DataPath + "fullwidth.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullheight.png", DataPath + "fullheight.png", false);
     }
     Log ("	Done");
 }
@@ -153,6 +158,8 @@ int Advanced () {
 
         TLabel frequencyDefaultLabel = AddLabel (frequencyListLabel, 0, 24, 160, 24, "Def. Freq.");
         TEdit frequencyDefaultLine = AddLine (frequencyDefaultLabel, 80, -4, mainForm.Width - 128, ReadSetting (skDefaultFrequency), "Default frequency.");
+
+        TCheckBox chooseBorderOptionsCheckBox = AddCheckBox (frequencyDefaultLabel, 0, 24, ReadSettingBool (skChooseBorderOption), "Choose Border", "Adds border options to the FOMOD installer.");
 
         TButton btnOk = AddButton (nil, 8, mainForm.Height - 64, "OK", 1);
         TButton btnCancel = AddButton (btnOk, 80, 0, "Cancel", 2);

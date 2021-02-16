@@ -14,6 +14,7 @@ class InstallOption:
         self.name = name
         self.flags: [(str, str)] = []
         self.default = False
+        self.image = ''
 
     def add_file(self, src, dest):
         self.files.append((src, dest))
@@ -26,6 +27,9 @@ class InstallOption:
 
     def set_default(self):
         self.default = True
+
+    def add_image(self, path):
+        self.image = os.path.join('fomod', path)
 
 
 class InstallStep:
@@ -108,6 +112,8 @@ class Fomod:
                 self.write_line('<plugin name="' + option.name + '">')
                 self.indent()
                 self.write_line('<description>' + option.description + '</description>')
+                if option.image != "":
+                    self.write_line('<image path="' + option.image + '"/>')
                 if len(option.files) + len(option.folders) > 0:
                     self.write_line('<files>')
                     self.indent()
@@ -196,6 +202,9 @@ class Settings:
         self.sk_frequency_list = self.get_setting_key()
         self.sk_default_frequency = self.get_setting_key()
         self.sk_mod_link = self.get_setting_key()
+        self.sk_border_options = self.get_setting_key()
+        self.sk_resolution = self.get_setting_key()
+        self.sk_choose_border_option = self.get_setting_key()
 
     def get_setting_key(self):
         self.setting_key += 1
@@ -217,6 +226,7 @@ def main():
     settings = Settings()
 
     texture_path = os.path.join(os.getcwd(), "textures")
+    images_path = os.path.join(os.getcwd(), "images")
     mesh_path = os.path.join(os.getcwd(), "meshes")
 
     aspect_ratios = settings[settings.sk_aspect_ratios].split(",")
@@ -224,6 +234,16 @@ def main():
     plugin_name = settings[settings.sk_plugin_name]
     frequencies = settings[settings.sk_frequency_list].split(",")
     default_frequency = int(settings[settings.sk_default_frequency])
+    default_border_option = settings[settings.sk_border_options]
+    border_options = ['black', 'crop', 'stretch', 'fullheight', 'fullwidth']
+    border_option_names = ['Black', 'Crop', 'Stretch', 'Full Height', 'Full Width']
+    border_option_descriptions = [
+        'Uses letterboxes (top and bottom black bars) and pillarboxes (left and right black bars) to fit the image to the screen aspect ratio.',
+        'Crops the image to fit it to the screen aspect ratio. The parts of the image that lie outside the screen are not displayed, effectively cropping the image.',
+        'Stretches the image to fit it to the screen aspect ratio. Not recommended. Will distort images.',
+        'Uses pillarboxes (left and right black bars) or horizontal cropping to fit the image to the screen aspect ratio. The parts of the image that lie outside the screen are not displayed, effectively cropping the image.',
+        'Uses letterboxes (top and bottom black bars) or vertical cropping to fit the image to the screen aspect ratio. The parts of the image that lie outside the screen are not displayed, effectively cropping the image.',
+    ]
 
     mod_name = settings[settings.sk_mod_name]
     mod_version = settings[settings.sk_mod_version]
@@ -258,17 +278,30 @@ def main():
 
     # Move files
     shutil.copytree(texture_path, os.path.join(main_folder, "textures"))
+    shutil.copytree(images_path, os.path.join(fomod_folder, "fomod", "images"))
     for aspect_ratio in aspect_ratios:
-        shutil.copytree(os.path.join(mesh_path, aspect_ratio), os.path.join(fomod_folder, aspect_ratio, "meshes"))
+        if settings[settings.sk_choose_border_option]:
+            for opt in border_options:
+                fomod_mesh_path = os.path.join(fomod_folder, aspect_ratio, opt, "meshes")
+                shutil.copytree(os.path.join(mesh_path, aspect_ratio, opt), fomod_mesh_path)
+                safe_make_directory(os.path.join(fomod_mesh_path, "_mesh_option_" + str(aspect_ratio) + "_" + str(opt)))
+        else:
+            fomod_mesh_path = os.path.join(fomod_folder, aspect_ratio, default_border_option, "meshes")
+            shutil.copytree(os.path.join(mesh_path, aspect_ratio, default_border_option), fomod_mesh_path)
+            safe_make_directory(os.path.join(fomod_mesh_path, "_mesh_option_" + str(aspect_ratio) + "_" + str(default_border_option)))
 
     for p in frequencies:
         plugin = "FOMOD_M0" + "_P" + str(p) + "_FOMODEND_" + plugin_name
         if os.path.exists(plugin):
-            shutil.copy(plugin, os.path.join(fomod_folder, "no_messages", "p" + str(p), plugin_name))
+            fomod_plugin_path = os.path.join(fomod_folder, "no_messages", "p" + str(p))
+            shutil.copy(plugin, os.path.join(fomod_plugin_path, plugin_name))
+            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_no_messages_" + str(p)))
 
         plugin = "FOMOD_M1" + "_P" + str(p) + "_FOMODEND_" + plugin_name
         if os.path.exists(plugin):
-            shutil.copy(plugin, os.path.join(fomod_folder, "messages", "p" + str(p), plugin_name))
+            fomod_plugin_path = os.path.join(fomod_folder, "messages", "p" + str(p))
+            shutil.copy(plugin, os.path.join(fomod_plugin_path, plugin_name))
+            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_messages_" + str(p)))
 
     info_xml = open(os.path.join(fomod_folder, "fomod", "info.xml"), "w")
     info_xml.writelines([
@@ -285,19 +318,55 @@ def main():
     module_config_xml = open(os.path.join(fomod_folder, "fomod", "ModuleConfig.xml"), "w")
     fomod = Fomod(module_config_xml, mod_name)
 
+    # textures
     fomod.add_required_folder('main', '')
 
+    # meshes
     if len(aspect_ratios) > 1:
         choose_aspect_ratio = InstallStep('Aspect Ratio')
+        fomod.add_install_step(choose_aspect_ratio)
         for aspect_ratio in aspect_ratios:
             ratio_option = InstallOption(aspect_ratio,
                                          'Use this option, if you have an aspect ratio of ' + aspect_ratio + '.')
-            ratio_option.add_folder(aspect_ratio, '')
-            choose_aspect_ratio.add_option(ratio_option)
-        fomod.add_install_step(choose_aspect_ratio)
-    else:
-        fomod.add_required_folder(aspect_ratios[0], '')
+            if settings[settings.sk_choose_border_option]:
+                ratio_option.add_flag('aspect_ratio_' + aspect_ratio, 'true')
+                choose_border_option = InstallStep('Border Options')
 
+                k = 0
+                for opt in border_options:
+                    border_install_options = InstallOption(border_option_names[k], border_option_descriptions[k])
+                    border_install_options.add_folder(os.path.join(aspect_ratio, opt), '')
+                    border_install_options.add_image(os.path.join('images', opt + '.png'))
+                    if opt == default_border_option:
+                        border_install_options.set_default()
+                    choose_border_option.add_option(border_install_options)
+                    k += 1
+
+                choose_border_option.require_flag('aspect_ratio_' + aspect_ratio, 'true')
+                fomod.add_install_step(choose_border_option)
+            else:
+                ratio_option.add_folder(os.path.join(aspect_ratio, default_border_option), '')
+            choose_aspect_ratio.add_option(ratio_option)
+    else:
+        if settings[settings.sk_choose_border_option]:
+            aspect_ratio = aspect_ratios[0]
+            choose_border_option = InstallStep('Border Options')
+
+            k = 0
+            for opt in border_options:
+                border_install_options = InstallOption(border_option_names[k], border_option_descriptions[k])
+                border_install_options.add_folder(os.path.join(aspect_ratio, opt), '')
+                border_install_options.add_image(os.path.join('images', opt + '.png'))
+                if opt == default_border_option:
+                    border_install_options.set_default()
+                choose_border_option.add_option(border_install_options)
+                k += 1
+
+            fomod.add_install_step(choose_border_option)
+        else:
+            fomod.add_required_folder(os.path.join(aspect_ratios[0], default_border_option), '')
+
+    # plugin
     if messages == 'optional':
         choose_messages = InstallStep('Display Messages')
         yes = InstallOption('Yes', 'Enables loading screen messages.')
@@ -351,6 +420,7 @@ def main():
         if messages == 'never':
             fomod.add_install_step(choose_frequency_no)
 
+    # finalize
     fomod.write_file()
     module_config_xml.close()
     zip_path_7z = mod_name + '_' + mod_version + '.7z'

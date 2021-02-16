@@ -9,7 +9,7 @@ const float sourceRatio = 1.6;
 float heightFactor;
 float widthFactor;
 
-void FitToDisplayRatio (float displayRatio, float imageRatio) {
+void FitToDisplayRatio (float displayRatio, float imageRatio, string borderOption) {
     // In the first part, the factors are adjusted, so the model fills the entire screen.
     // A width of 1.0 means the entire width of the image is visible on the screen, so width stays at 1.
     // For wider screens (ratioFactor > 1.0), the height is reduced.
@@ -21,8 +21,6 @@ void FitToDisplayRatio (float displayRatio, float imageRatio) {
     // Now the model fills the entire screen.
     // In order to keep the aspect ratio of the image, the model must be modified.
     // Here, the model only becomes smaller, in order to add black bars.
-
-    string borderOption = ReadSetting (skBorderOptions);
 
     if (borderOption != "stretch") {
         if (displayRatio > imageRatio) {
@@ -53,7 +51,7 @@ void FitToDisplayRatio (float displayRatio, float imageRatio) {
     heightFactor = height;
 }
 
-void CreateMeshes (string targetPath, string texturePath, TwbNifFile templateNif, bool sse, float displayRatio) {
+void CreateMeshes (string targetPath, string texturePath, TwbNifFile templateNif, bool sse, float displayRatio, string borderOption) {
     for (int i = 0; i < imagePathArray.Count (); i += 1) {
         Log ("	" + inttostr (i + 1) + "/" + inttostr (imagePathArray.Count ()) + ": " + targetPath + "\\" + imagePathArray[i] + ".nif");
         TwbNifBlock TextureSet;
@@ -64,7 +62,7 @@ void CreateMeshes (string targetPath, string texturePath, TwbNifFile templateNif
         }
         TdfElement Textures = TextureSet.Elements["Textures"];
         Textures[0].EditValue = texturePath + "\\" + imagePathArray[i] + ".dds";
-        FitToDisplayRatio (displayRatio, strtofloat (imageWidthArray[i]) / strtofloat (imageHeightArray[i]));
+        FitToDisplayRatio (displayRatio, strtofloat (imageWidthArray[i]) / strtofloat (imageHeightArray[i]), borderOption);
         TdfElement VertexData;
         string VertexPrefix;
         int blockIndex = -1;
@@ -139,15 +137,28 @@ void MeshGen (bool advanced, string texturePathShort, string templatePath) {
             Log ("Error while parsing the aspect ratio list: " + ReadSetting (skAspectRatios));
             throw E;
         }
+        TStringList borderOptionList = TStringList.Create ();
+        if (ReadSettingBool (skChooseBorderOption)) {
+            borderOptionList.add ("stretch");
+            borderOptionList.add ("black");
+            borderOptionList.add ("crop");
+            borderOptionList.add ("fullheight");
+            borderOptionList.add ("fullwidth");
+        } else {
+            borderOptionList.add (ReadSetting (skBorderOptions));
+        }
+
         for (int i = 0; i < aspectRatioList.Count (); i += 1) {
-            string meshPath = DataPath + "meshes\\" + aspectRatioList[i] + "\\" + ReadSetting (skModFolder);
-            Log ("	Creating loading screen meshes for aspect ratio: " + aspectRatioList[i]);
-            forcedirectories (meshPath);
-            CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", strtofloat (widthList[i]) / strtofloat (heightList[i]));
+            for (int j = 0; j < borderOptionList.Count (); j += 1) {
+                string meshPath = DataPath + "meshes\\" + aspectRatioList[i] + "\\" + borderOptionList[j] + "\\" + ReadSetting (skModFolder);
+                Log ("	Creating loading screen meshes for aspect ratio: " + aspectRatioList[i]);
+                forcedirectories (meshPath);
+                CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", strtofloat (widthList[i]) / strtofloat (heightList[i]), borderOptionList[j]);
+            }
         }
     } else {
         string meshPath = DataPath + "meshes\\JLoadScreens";
         forcedirectories (meshPath);
-        CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", ReadSettingInt (skDisplayWidth) / ReadSettingInt (skDisplayHeight));
+        CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", ReadSettingInt (skDisplayWidth) / ReadSettingInt (skDisplayHeight), ReadSetting (skBorderOptions));
     }
 }

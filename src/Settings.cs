@@ -4,7 +4,7 @@ int settingKey;
 int skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight,
 skFrequency, skGamma, skContrast, skBrightness, skSaturation, skBorderOptions, skResolution, skModName, skModVersion,
 skModFolder, skPluginName, skModAuthor, skPrefix, skModLink, skTestMode, skAspectRatios, skTextureResolutions,
-skMessages, skFrequencyList, skDefaultFrequency;
+skMessages, skFrequencyList, skDefaultFrequency, skChooseBorderOption;
 
 int GetSettingKey (string def) {
     if (settings.Count () <= settingKey) {
@@ -88,5 +88,7 @@ void InitSettingKeys () {
 
     skBorderOptions = GetSettingKey ("black");
     skResolution = GetSettingKey ("2048");
+
+    skChooseBorderOption = GetSettingKey ("True");
 
 }
