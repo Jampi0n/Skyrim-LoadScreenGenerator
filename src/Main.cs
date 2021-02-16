@@ -76,11 +76,12 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
         CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.cmd", DataPath + "create_fomod.cmd", false);
         CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.py", DataPath + "create_fomod.py", false);
         CopyFile (editScriptsSubFolder + "\\settings.txt", DataPath + "settings.txt", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\black.png", DataPath + "black.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\crop.png", DataPath + "crop.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\stretch.png", DataPath + "stretch.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullwidth.png", DataPath + "fullwidth.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullheight.png", DataPath + "fullheight.png", false);
+        forcedirectories (DataPath + "\\images");
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\black.png", DataPath + "images\\black.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\crop.png", DataPath + "images\\crop.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\stretch.png", DataPath + "images\\stretch.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullwidth.png", DataPath + "images\\fullwidth.png", false);
+        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullheight.png", DataPath + "images\\fullheight.png", false);
     }
     Log ("	Done");
 }
