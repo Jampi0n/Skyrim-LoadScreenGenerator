@@ -47,8 +47,8 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
         CleanMasters (esp);
         Add (esp, "LSCR", True);
         Add (esp, "STAT", True);
+        Add (esp, "GLOB", True);
         if (ReadSettingBool (skTestMode)) {
-            Add (esp, "GLOB", True);
             IwbMainRecord globRecord = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
             SetEditorID (globRecord, prefix + "TestMode");
         }
@@ -56,6 +56,14 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
         float probability = 1.0 - Power (1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
 
         TStringList approximationArray = CreateRandomProbability (probability, 4);
+        TStringList chanceGlobalList = TStringList.Create ();
+        for (int j = 0; j < approximationArray.Count (); j += 1) {
+            IwbMainRecord chanceGlobal = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
+            chanceGlobalList.add (IntToHex (GetLoadOrderFormID (chanceGlobal), 8));
+            SetEditorID (chanceGlobal, prefix + "Chance_" + inttostr (j));
+            SetValueInt (chanceGlobal, "FLTV - Value", Trunc (100 * strtofloat (approximationArray[j])) - 1);
+            SetValueString (chanceGlobal, "Record Header\\Record Flags", "0000001");
+        }
 
         for (int i = 0; i < imagePathArray.Count (); i += 1) {
             string editorID = inttostr (i);
@@ -87,8 +95,8 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
             } else {
                 for (int j = 0; j < approximationArray.Count (); j += 1) {
                     ElementAssign (ElementByPath (lscrRecord, "Conditions"), HighInteger, nil, false);
-                    SetValueInt (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Type", 10100000);
-                    SetValueInt (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Comparison Value", Trunc (100 * strtofloat (approximationArray[j])) - 1);
+                    SetValueInt (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Type", 10100100);
+                    SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Comparison Value", chanceGlobalList[j]);
                     SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Function", "GetRandomPercent");
                 }
                 Remove (ElementByPath (lscrRecord, "Conditions\\[" + inttostr (approximationArray.Count ()) + "]"));
