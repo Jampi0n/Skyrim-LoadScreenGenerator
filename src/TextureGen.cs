@@ -45,7 +45,6 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
     ignoredFiles.Duplicates = dupIgnore;
 
     string resolution = inttostr (ReadSettingInt (skResolution));
-
     Log ("	Creating textures from source images...");
     for (int i = 0; i < imageCount; i += 1) {
         // Ensure this the only file with this name
@@ -55,91 +54,113 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
 
             texturePathList.Add (s);
 
-            bool srgb = false;
-            string srgbCmd = "";
+            if (ReadSettingBool (skGenerateTextures)) {
+                bool srgb = false;
+                string srgbCmd = "";
 
-            // use texdiag to read input format
-            try {
-                cmd = "/C  \"\"" + editScriptsSubFolder + "\\DirectXTex\\texdiag.exe\" info \"" + sourcePathList[i] + "\" -nologo > \"" + editScriptsSubFolder + "\\texdiag.txt\"\"";
-                ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
-                // Read output from %subfolder%\texdiag.txt
-                TStringList readTextFile = TStringList.Create ();
-                readTextFile.LoadFromFile (editScriptsSubFolder + "\\texdiag.txt");
-
-                if (readTextFile.Count <= 0) {
-                    throw exception.Create ("texdiag.txt is empty.");
-                }
-                if (ContainsText (readTextFile[0], "FAILED")) {
-                    throw exception.Create ("texdiag.exe failed to analyze the texture.");
-                }
-
-                if (ContainsText (ParseTexDiagOutput (readTextFile[6]), "SRGB")) {
-                    srgb = True;
-                }
-            } catch (Exception E) {
-                Log (E.ClassName + " error raised, with message : " + E.Message);
-                Log ("Error while using texdiag.exe for image " + sourcePathList[i]);
-                continue;
-            }
-
-            if (srgb) {
-                srgbCmd = "-srgb ";
-            }
-
-            try {
-                // Execute texconv.exe (timeout = 10 seconds)
-                cmd = " -m 1 -f BC1_UNORM " + srgbCmd + "-o \"" + targetPath + "\" -y -w " + resolution + " -h " + resolution + " \"" + sourcePathList[i] + "\"";
-                CreateProcessWait (ScriptsPath + "Texconv.exe", cmd, SW_HIDE, 10000);
-                cmd = " -f BC1_UNORM " + "-o \"" + targetPath + "\" -y -w " + resolution + " -h " + resolution + " \"" + targetPath + "\\" + s + ".dds" + " \"";
-                CreateProcessWait (ScriptsPath + "Texconv.exe", cmd, SW_HIDE, 10000);
-            } catch (Exception E) {
-                Log (E.ClassName + " error raised, with message : " + E.Message);
-                Log ("Error while using texconv.exe for image " + sourcePathList[i]);
-                continue;
-            }
-
-            try {
-                // Change gamma/contrast
-                if ((gamma != 1.0) || (ReadSettingInt (skContrast) != 0)) {
-
-                    cmd = "\"" + targetPath + "\\" + s + ".dds\"";
-                    cmd = "/C \"\"" + editScriptsSubFolder + "\\ImageMagick\\magick.exe\" " + cmd + " - level " + floattostr (blackPoint) + " %," + floattostr (whitePoint) + " %," + floattostr (gamma) + " " + cmd + "\"";
+                // use texdiag to read input format
+                try {
+                    cmd = "/C  \"\"" + editScriptsSubFolder + "\\DirectXTex\\texdiag.exe\" info \"" + sourcePathList[i] + "\" -nologo > \"" + editScriptsSubFolder + "\\texdiag.txt\"\"";
                     ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
-                }
-                // Change brightness/saturation
-                if ((brightness != 100.0) || (saturation != 100)) {
+                    // Read output from %subfolder%\texdiag.txt
+                    TStringList readTextFile = TStringList.Create ();
+                    readTextFile.LoadFromFile (editScriptsSubFolder + "\\texdiag.txt");
 
-                    cmd = "\"" + targetPath + "\\" + s + ".dds\"";
-                    cmd = "/C \"\"" + editScriptsSubFolder + "\\ImageMagick\\magick.exe\" " + cmd + " - modulate " + floattostr (brightness) + "," + floattostr (saturation) + " " + cmd + "\"";
-                    ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
-                }
-            } catch (Exception E) {
+                    if (readTextFile.Count <= 0) {
+                        throw exception.Create ("texdiag.txt is empty.");
+                    }
+                    if (ContainsText (readTextFile[0], "FAILED")) {
+                        throw exception.Create ("texdiag.exe failed to analyze the texture.");
+                    }
 
-                Log (E.ClassName + " error raised, with message : " + E.Message);
-                Log ("Error while using magick.exe for image " + sourcePathList[i]);
-                continue;
+                    if (ContainsText (ParseTexDiagOutput (readTextFile[6]), "SRGB")) {
+                        srgb = True;
+                    }
+                } catch (Exception E) {
+                    Log (E.ClassName + " error raised, with message : " + E.Message);
+                    Log ("Error while using texdiag.exe for image " + sourcePathList[i]);
+                    continue;
+                }
+
+                if (srgb) {
+                    srgbCmd = "-srgb ";
+                }
+
+                try {
+                    // Execute texconv.exe (timeout = 10 seconds)
+                    cmd = " -m 1 -f BC1_UNORM " + srgbCmd + "-o \"" + targetPath + "\" -y -w " + resolution + " -h " + resolution + " \"" + sourcePathList[i] + "\"";
+                    CreateProcessWait (ScriptsPath + "Texconv.exe", cmd, SW_HIDE, 10000);
+                    cmd = " -f BC1_UNORM " + "-o \"" + targetPath + "\" -y -w " + resolution + " -h " + resolution + " \"" + targetPath + "\\" + s + ".dds" + " \"";
+                    CreateProcessWait (ScriptsPath + "Texconv.exe", cmd, SW_HIDE, 10000);
+                } catch (Exception E) {
+                    Log (E.ClassName + " error raised, with message : " + E.Message);
+                    Log ("Error while using texconv.exe for image " + sourcePathList[i]);
+                    continue;
+                }
+
+                try {
+                    // Change gamma/contrast
+                    if ((gamma != 1.0) || (ReadSettingInt (skContrast) != 0)) {
+
+                        cmd = "\"" + targetPath + "\\" + s + ".dds\"";
+                        cmd = "/C \"\"" + editScriptsSubFolder + "\\ImageMagick\\magick.exe\" " + cmd + " - level " + floattostr (blackPoint) + " %," + floattostr (whitePoint) + " %," + floattostr (gamma) + " " + cmd + "\"";
+                        ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
+                    }
+                    // Change brightness/saturation
+                    if ((brightness != 100.0) || (saturation != 100)) {
+
+                        cmd = "\"" + targetPath + "\\" + s + ".dds\"";
+                        cmd = "/C \"\"" + editScriptsSubFolder + "\\ImageMagick\\magick.exe\" " + cmd + " - modulate " + floattostr (brightness) + "," + floattostr (saturation) + " " + cmd + "\"";
+                        ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
+                    }
+                } catch (Exception E) {
+
+                    Log (E.ClassName + " error raised, with message : " + E.Message);
+                    Log ("Error while using magick.exe for image " + sourcePathList[i]);
+                    continue;
+                }
             }
 
-            try {
-                // Execute %subfolder%\texdiag.exe
-                // Output is saved to %subfolder%\texdiag.txt
-                cmd = "/C  \"\"" + editScriptsSubFolder + "\\DirectXTex\\texdiag.exe\" info \"" + sourcePathList[i] + "\" -nologo > \"" + editScriptsSubFolder + "\\texdiag.txt\"\"";
-                ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
-                // Read output from %subfolder%\texdiag.txt
-                TStringList readTextFile = TStringList.Create ();
-                readTextFile.LoadFromFile (editScriptsSubFolder + "\\texdiag.txt");
+            if (ReadSettingBool (skGenerateMeshes)) {
+                try {
+                    // Execute %subfolder%\texdiag.exe
+                    // Output is saved to %subfolder%\texdiag.txt
+                    cmd = "/C  \"\"" + editScriptsSubFolder + "\\DirectXTex\\texdiag.exe\" info \"" + sourcePathList[i] + "\" -nologo > \"" + editScriptsSubFolder + "\\texdiag.txt\"\"";
+                    ShellExecuteWait (0, nil, "cmd.exe", cmd, "", SW_HIDE);
+                    // Read output from %subfolder%\texdiag.txt
+                    TStringList readTextFile = TStringList.Create ();
+                    readTextFile.LoadFromFile (editScriptsSubFolder + "\\texdiag.txt");
 
-                if (readTextFile.Count <= 0) {
-                    throw exception.Create ("texdiag.txt is empty.");
-                }
-                if (ContainsText (readTextFile[0], "FAILED")) {
-                    throw exception.Create ("texdiag.exe failed to analyze the texture.");
-                }
+                    if (readTextFile.Count <= 0) {
+                        throw exception.Create ("texdiag.txt is empty.");
+                    }
+                    if (ContainsText (readTextFile[0], "FAILED")) {
+                        throw exception.Create ("texdiag.exe failed to analyze the texture.");
+                    }
 
+                    imagePathArray.Add (s);
+                    imageWidthArray.Add (inttostr (strtoint (ParseTexDiagOutput (readTextFile[1]))));
+                    imageHeightArray.Add (inttostr (strtoint (ParseTexDiagOutput (readTextFile[2]))));
+                    string textFile = ChangeFileExt (sourcePathList[i], ".txt");
+                    if (FileExists (textFile)) {
+                        readTextFile = TStringList.Create ();
+                        readTextFile.LoadFromFile (textFile);
+                        if (readTextFile.Count <= 0) {
+                            throw exception.Create (s + ".txt is empty.");
+                        }
+                        imageTextArray.Add (readTextFile[0]);
+                    } else {
+                        imageTextArray.Add ("");
+                    }
+                } catch (Exception E) {
+                    Log ("	");
+                    Log (E.ClassName + " error raised, with message : " + E.Message);
+                    Log ("Error while using texdiag.exe for image " + sourcePathList[i]);
+                    Log ("	");
+                    continue;
+                }
+            } else {
                 imagePathArray.Add (s);
-                imageWidthArray.Add (inttostr (strtoint (ParseTexDiagOutput (readTextFile[1]))));
-                imageHeightArray.Add (inttostr (strtoint (ParseTexDiagOutput (readTextFile[2]))));
-                string textFile = ChangeFileExt (sourcePathList[i], ".txt");
                 if (FileExists (textFile)) {
                     readTextFile = TStringList.Create ();
                     readTextFile.LoadFromFile (textFile);
@@ -150,12 +171,6 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
                 } else {
                     imageTextArray.Add ("");
                 }
-            } catch (Exception E) {
-                Log ("	");
-                Log (E.ClassName + " error raised, with message : " + E.Message);
-                Log ("Error while using texdiag.exe for image " + sourcePathList[i]);
-                Log ("	");
-                continue;
             }
 
         } else {

@@ -66,7 +66,9 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
     Log ("	");
 
     // Create .nif files in mesh path
-    MeshGen (advanced, texturePathShort, templatePath);
+    if (ReadSettingBool (skGenerateMeshes)) {
+        MeshGen (advanced, texturePathShort, templatePath);
+    }
 
     // Create .esp
     PluginGen (advanced, disableOthers, pluginName);
@@ -149,7 +151,7 @@ int Advanced () {
         TLabel modLinkLabel = AddLabel (modPrefixLabel, 0, 24, 160, 24, "Prefix");
         TEdit modLinkLine = AddLine (modLinkLabel, 80, -4, mainForm.Width - 128, ReadSetting (skModLink), "Will be used for the FOMOD installer.");
 
-        TGroupBox optionsBox = AddBox (modBox, 0, modBox.Height + 8, mainForm.Width - 24, 128, "Options");
+        TGroupBox optionsBox = AddBox (modBox, 0, modBox.Height + 8, mainForm.Width - 24, 168, "Options");
 
         TLabel messagesLabel = AddLabel (optionsBox, 16, 24, 160, 24, "Messages");
         TEdit messagesLine = AddLine (messagesLabel, 80, -4, mainForm.Width - 128, ReadSetting (skMessages), "always/never/optional");
@@ -161,6 +163,10 @@ int Advanced () {
         TEdit frequencyDefaultLine = AddLine (frequencyDefaultLabel, 80, -4, mainForm.Width - 128, ReadSetting (skDefaultFrequency), "Default frequency.");
 
         TCheckBox chooseBorderOptionsCheckBox = AddCheckBox (frequencyDefaultLabel, 0, 24, ReadSettingBool (skChooseBorderOption), "Choose Border", "Adds border options to the FOMOD installer.");
+
+        TCheckBox generateTexturesCheckBox = AddCheckBox (chooseBorderOptionsCheckBox, 0, 24, ReadSettingBool (skGenerateTextures), "Generate Textures", "This step takes long and can be disabled, if the textures were generated previously. Make sure only valid images are in the directory, as image processing/validation may be skipped.");
+
+        TCheckBox generateMeshesCheckBox = AddCheckBox (generateTexturesCheckBox, 0, 24, ReadSettingBool (skGenerateMeshes), "Generate Meshes", "This step takes long and can be disabled, if the meshes were generated previously. Make sure only valid images are in the directory, as image processing/validation may be skipped.");
 
         TButton btnOk = AddButton (nil, 8, mainForm.Height - 64, "OK", 1);
         TButton btnCancel = AddButton (btnOk, 80, 0, "Cancel", 2);
@@ -178,6 +184,9 @@ int Advanced () {
             WriteSetting (skMessages, messagesLine.Text);
             WriteSetting (skFrequencyList, frequencyListLine.Text);
             WriteSetting (skDefaultFrequency, frequencyDefaultLine.Text);
+            WriteSetting (skChooseBorderOption, chooseBorderOptionsCheckBox.Checked);
+            WriteSetting (skGenerateTextures, generateTexturesCheckBox.Checked);
+            WriteSetting (skGenerateMeshes, generateMeshesCheckBox.Checked);
 
             SaveSettings ();
             if (!error) {
