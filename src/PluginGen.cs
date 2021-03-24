@@ -27,7 +27,7 @@ void PatchLoadingScreens (IwbFile esp) {
     CleanMasters (esp);
 }
 
-IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disableOthers, bool includeMessages, int frequency) {
+IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disableOthers, bool includeMessages, int frequency, string conditions) {
     Log ("	Creating plugin file \"" + fileName + "\"");
 
     bool esl = (wbAppName == "SSE") && (imagePathArray.Count () < 1024);
@@ -55,28 +55,23 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
         Add (esp, "LSCR", True);
         Add (esp, "STAT", True);
 
-        int conditions = 2;
-        // -1: test mode
         // 0: no conditions = standalone
         // 1: always true conditions = replacer
         // 2: frequency with MCM
-        // 3: old frequency
-
-        IwbMainRecord globRecord;
-        if (conditions == -1) {
-            Add (esp, "GLOB", True);
-            if (ReadSettingBool (skTestMode)) {
-                globRecord = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
-                SetEditorID (globRecord, prefix + "TestMode");
-            }
-        }
+        // 3: frequency without MCM
+        // 4: old frequency
+        // 5: test mode
 
         float probability = 1.0 - Power (1.0 - 0.01 * frequency, 1.0 / totalLoadScreens);
         TStringList approximationArray = CreateRandomProbability (probability, 4);
         TStringList chanceGlobalList = TStringList.Create ();
         IwbMainRecord syncRandomVar;
         IwbMainRecord mcmFrequencyVar;
-        if (conditions == 2) {
+        IwbMainRecord globRecord;
+        bool validConditions = true;
+        if ((conditions == "standalone") || (conditions == "replacer")) {
+            // do nothing
+        } else if ((conditions == "mcm") || (conditions == "fixed")) {
             // https://www.creationkit.com/index.php?title=Detect_Player_Cell_Change_(Without_Polling)
             Add (esp, "GLOB", True);
             Add (esp, "QUST", True);
@@ -88,7 +83,7 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
             SetEditorID (syncRandomVar, prefix + "SyncRandomVar");
             mcmFrequencyVar = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
             SetEditorID (mcmFrequencyVar, prefix + "McmFrequencyVar");
-            SetValueInt (mcmFrequencyVar, "FLTV - Value", 50);
+            SetValueInt (mcmFrequencyVar, "FLTV - Value", frequency);
 
             IwbMainRecord cellStalkerCell = Add (GroupBySignature (esp, "CELL"), "CELL", True);
             SetEditorID (cellStalkerCell, prefix + "CellStalkerCell");
@@ -175,28 +170,28 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
             IwbElement aliasSpells = Add (alias, "ALSP", true);
             SetLinksTo (aliasSpells, "[0]", cellStalkerSpell);
 
-            IwbElement vmad = Add (mcmQuest, "VMAD", true);
+            if (conditions == "mcm") {
+                IwbElement vmad = Add (mcmQuest, "VMAD", true);
 
-            IwbElement script = ElementAssign (ElementByPath (vmad, "Scripts"), HighInteger, Nil, false);
-            SetValueString (script, "ScriptName", globalPrefix + "MCM_Quest_Script");
-            IwbElement modNameProperty = ElementAssign (ElementByPath (script, "Properties"), HighInteger, Nil, false);
-            SetValueString (modNameProperty, "propertyName", "ModName");
-            SetValueString (modNameProperty, "Type", "String");
-            SetValueString (modNameProperty, "String", ReadSetting (skModName));
+                IwbElement script = ElementAssign (ElementByPath (vmad, "Scripts"), HighInteger, Nil, false);
+                SetValueString (script, "ScriptName", globalPrefix + "MCM_Quest_Script");
+                IwbElement modNameProperty = ElementAssign (ElementByPath (script, "Properties"), HighInteger, Nil, false);
+                SetValueString (modNameProperty, "propertyName", "ModName");
+                SetValueString (modNameProperty, "Type", "String");
+                SetValueString (modNameProperty, "String", ReadSetting (skModName));
 
-            IwbElement frequencyProperty = ElementAssign (ElementByPath (script, "Properties"), HighInteger, Nil, false);
-            SetValueString (frequencyProperty, "propertyName", "FrequencyProperty");
-            SetValueString (frequencyProperty, "Type", "Object");
-            SetLinksTo (frequencyProperty, "Value\\Object Union\\Object v2\\FormID", mcmFrequencyVar);
+                IwbElement frequencyProperty = ElementAssign (ElementByPath (script, "Properties"), HighInteger, Nil, false);
+                SetValueString (frequencyProperty, "propertyName", "FrequencyProperty");
+                SetValueString (frequencyProperty, "Type", "Object");
+                SetLinksTo (frequencyProperty, "Value\\Object Union\\Object v2\\FormID", mcmFrequencyVar);
 
-            alias = ElementAssign (ElementByPath (vmad, "Aliases"), HighInteger, Nil, false);
-            SetLinksTo (alias, "Object Union\\Object v2\\FormID", mcmQuest);
-            SetValueInt (alias, "Object Union\\Object v2\\Alias", 0);
-            IwbElement aliasScript = ElementAssign (ElementByPath (alias, "Alias Scripts"), HighInteger, Nil, false);
-            SetValueString (aliasScript, "ScriptName", "SKI_PlayerLoadGameAlias");
-
-        }
-        if (conditions == 3) {
+                alias = ElementAssign (ElementByPath (vmad, "Aliases"), HighInteger, Nil, false);
+                SetLinksTo (alias, "Object Union\\Object v2\\FormID", mcmQuest);
+                SetValueInt (alias, "Object Union\\Object v2\\Alias", 0);
+                IwbElement aliasScript = ElementAssign (ElementByPath (alias, "Alias Scripts"), HighInteger, Nil, false);
+                SetValueString (aliasScript, "ScriptName", "SKI_PlayerLoadGameAlias");
+            }
+        } else if (conditions == "deprecated") {
             Add (esp, "GLOB", True);
             for (int j = 0; j < approximationArray.Count (); j += 1) {
                 IwbMainRecord chanceGlobal = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
@@ -205,78 +200,88 @@ IwbFile CreateESP (string fileName, string meshPath, string prefix, bool disable
                 SetValueInt (chanceGlobal, "FLTV - Value", Trunc (100 * strtofloat (approximationArray[j])) - 1);
                 SetValueString (chanceGlobal, "Record Header\\Record Flags", "0000001");
             }
+        } else if (conditions == "test") {
+            Add (esp, "GLOB", True);
+            if (ReadSettingBool (skTestMode)) {
+                globRecord = Add (GroupBySignature (esp, "GLOB"), "GLOB", True);
+                SetEditorID (globRecord, prefix + "TestMode");
+            }
+        } else {
+            validConditions = false;
+            Log ("No loading plugin generated for invalid conditions option: " + conditions);
         }
+        if (validConditions) {
+            for (int i = 0; i < imagePathArray.Count (); i += 1) {
+                string editorID = inttostr (i);
 
-        for (int i = 0; i < imagePathArray.Count (); i += 1) {
-            string editorID = inttostr (i);
+                IwbMainRecord statRecord = Add (GroupBySignature (esp, "STAT"), "STAT", True);
+                SetEditorID (statRecord, prefix + "STAT_" + editorID);
 
-            IwbMainRecord statRecord = Add (GroupBySignature (esp, "STAT"), "STAT", True);
-            SetEditorID (statRecord, prefix + "STAT_" + editorID);
+                Add (statRecord, "MODL", True);
+                SetValueString (statRecord, "Model\\MODL - Model FileName", meshPath + "\\" + imagePathArray[i] + ".nif");
+                SetValueInt (statRecord, "DNAM\\Max Angle (30-120)", 90);
 
-            Add (statRecord, "MODL", True);
-            SetValueString (statRecord, "Model\\MODL - Model FileName", meshPath + "\\" + imagePathArray[i] + ".nif");
-            SetValueInt (statRecord, "DNAM\\Max Angle (30-120)", 90);
+                IwbMainRecord lscrRecord = Add (GroupBySignature (esp, "LSCR"), "LSCR", True);
+                SetEditorID (lscrRecord, prefix + "LSCR_" + editorID);
+                SetLinksTo (lscrRecord, "NNAM", statRecord);
+                Add (lscrRecord, "SNAM", True);
+                SetValueInt (lscrRecord, "SNAM", 2);
+                Add (lscrRecord, "RNAM", True);
+                SetValueInt (lscrRecord, "RNAM\\X", -90);
+                Add (lscrRecord, "ONAM", True);
+                Add (lscrRecord, "XNAM", True);
+                SetValueInt (lscrRecord, "XNAM\\X", -45);
 
-            IwbMainRecord lscrRecord = Add (GroupBySignature (esp, "LSCR"), "LSCR", True);
-            SetEditorID (lscrRecord, prefix + "LSCR_" + editorID);
-            SetLinksTo (lscrRecord, "NNAM", statRecord);
-            Add (lscrRecord, "SNAM", True);
-            SetValueInt (lscrRecord, "SNAM", 2);
-            Add (lscrRecord, "RNAM", True);
-            SetValueInt (lscrRecord, "RNAM\\X", -90);
-            Add (lscrRecord, "ONAM", True);
-            Add (lscrRecord, "XNAM", True);
-            SetValueInt (lscrRecord, "XNAM\\X", -45);
-
-            if (conditions == -1) {
-                Add (lscrRecord, "Conditions", True);
-                SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10000000);
-                SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", i);
-                SetValueString (lscrRecord, "Conditions\\[0]\\CTDA\\Function", "GetGlobalValue");
-                SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Global", globRecord);
-            } else {
-                if (conditions == 1) {
+                if (conditions == "test") {
                     Add (lscrRecord, "Conditions", True);
-                    SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10100000);
-                    SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", 100);
-                    SetValueString (lscrRecord, "Conditions\\[0]\\CTDA\\Function", "GetRandomPercent");
-                } else if (conditions == 2) {
-                    Add (lscrRecord, "Conditions", True);
-                    SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10100100);
-                    SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", mcmFrequencyVar);
+                    SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10000000);
+                    SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", i);
                     SetValueString (lscrRecord, "Conditions\\[0]\\CTDA\\Function", "GetGlobalValue");
-                    SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Global", syncRandomVar);
-                } else if (conditions == 3) {
-                    Add (lscrRecord, "Conditions", True);
-                    for (int j = 0; j < approximationArray.Count (); j += 1) {
-                        ElementAssign (ElementByPath (lscrRecord, "Conditions"), HighInteger, nil, false);
-                        SetValueInt (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Type", 10100100);
-                        SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Comparison Value", chanceGlobalList[j]);
-                        SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Function", "GetRandomPercent");
+                    SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Global", globRecord);
+                } else {
+                    if (conditions == "replacer") {
+                        Add (lscrRecord, "Conditions", True);
+                        SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10100000);
+                        SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", 100);
+                        SetValueString (lscrRecord, "Conditions\\[0]\\CTDA\\Function", "GetRandomPercent");
+                    } else if ((conditions == "mcm") || (conditions == "fixed")) {
+                        Add (lscrRecord, "Conditions", True);
+                        SetValueInt (lscrRecord, "Conditions\\[0]\\CTDA\\Type", 10100100);
+                        SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Comparison Value", mcmFrequencyVar);
+                        SetValueString (lscrRecord, "Conditions\\[0]\\CTDA\\Function", "GetGlobalValue");
+                        SetLinksTo (lscrRecord, "Conditions\\[0]\\CTDA\\Global", syncRandomVar);
+                    } else if (conditions == "deprecated") {
+                        Add (lscrRecord, "Conditions", True);
+                        for (int j = 0; j < approximationArray.Count (); j += 1) {
+                            ElementAssign (ElementByPath (lscrRecord, "Conditions"), HighInteger, nil, false);
+                            SetValueInt (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Type", 10100100);
+                            SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Comparison Value", chanceGlobalList[j]);
+                            SetValueString (lscrRecord, "Conditions\\[" + inttostr (j) + "]\\CTDA\\Function", "GetRandomPercent");
+                        }
+                        Remove (ElementByPath (lscrRecord, "Conditions\\[" + inttostr (approximationArray.Count ()) + "]"));
                     }
-                    Remove (ElementByPath (lscrRecord, "Conditions\\[" + inttostr (approximationArray.Count ()) + "]"));
+                }
+
+                if (includeMessages) {
+                    SetValueString (lscrRecord, "DESC - Description", imageTextArray[i]);
                 }
             }
-
-            if (includeMessages) {
-                SetValueString (lscrRecord, "DESC - Description", imageTextArray[i]);
+            if (disableOthers) {
+                PatchLoadingScreens (esp);
             }
-        }
-        if (disableOthers) {
-            PatchLoadingScreens (esp);
         }
     }
 }
 
-void CreateESPOptions (string pluginName, string modFolder, bool disableOthers, int msgSetting, int frequency) {
+void CreateESPOptions (string pluginName, string modFolder, bool disableOthers, int msgSetting, int frequency, string conditions) {
 
     if (msgSetting == 0) {
-        CreateESP ("FOMOD_M0_P" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, false, frequency);
+        CreateESP ("FOMOD_M0_P_" + conditions + "_" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, false, frequency, conditions);
     } else if (msgSetting == 1) {
-        CreateESP ("FOMOD_M1_P" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, true, frequency);
+        CreateESP ("FOMOD_M1_P_" + conditions + "_" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, true, frequency, conditions);
     } else if (msgSetting == 2) {
-        CreateESP ("FOMOD_M0_P" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, false, frequency);
-        CreateESP ("FOMOD_M1_P" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, true, frequency);
+        CreateESP ("FOMOD_M0_P_" + conditions + "_" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, false, frequency, conditions);
+        CreateESP ("FOMOD_M1_P_" + conditions + "_" + inttostr (frequency) + "_FOMODEND_" + pluginName, modFolder, ReadSetting (skPrefix), disableOthers, true, frequency, conditions);
     }
 }
 
@@ -294,14 +299,14 @@ void PluginGen (bool advanced, bool disableOthers, string pluginName) {
             msgSetting = 1;
             Log ("The messages option " + ReadSetting (skMessages) + " is invalid; \"always\" will be used instead.");
         }
-        TStringList frequencyList = TStringList.Create ();
-        frequencyList.Delimiter = ",";
-        frequencyList.StrictDelimiter = True;
-        frequencyList.DelimitedText = ReadSetting (skFrequencyList);
-        for (int i = 0; i < frequencyList.Count (); i += 1) {
-            CreateESPOptions (pluginName, ReadSetting (skModFolder), disableOthers, msgSetting, strtoint (frequencyList[i]));
+        TStringList conditionList = TStringList.Create ();
+        conditionList.Delimiter = ",";
+        conditionList.StrictDelimiter = True;
+        conditionList.DelimitedText = ReadSetting (skConditionList);
+        for (int i = 0; i < conditionList.Count (); i += 1) {
+            CreateESPOptions (pluginName, ReadSetting (skModFolder), disableOthers, msgSetting, ReadSettingInt (skFrequency), conditionList[i]);
         }
     } else {
-        CreateESP (defaultPluginName, defaultModFolder, defaultPrefix, disableOthers, true, ReadSettingInt (skFrequency));
+        CreateESP (defaultPluginName, defaultModFolder, defaultPrefix, disableOthers, true, ReadSettingInt (skFrequency), ReadSetting (skCondition));
     }
 }

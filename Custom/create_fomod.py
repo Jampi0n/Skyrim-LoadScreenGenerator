@@ -206,6 +206,11 @@ class Settings:
         self.sk_resolution = self.get_setting_key()
         self.sk_choose_border_option = self.get_setting_key()
 
+        self.sk_generate_textures = self.get_setting_key()
+        self.sk_generate_meshes = self.get_setting_key()
+        self.sk_condition = self.get_setting_key()
+        self.sk_condition_list = self.get_setting_key()
+
     def get_setting_key(self):
         self.setting_key += 1
         return self.setting_key - 1
@@ -228,12 +233,29 @@ def main():
     texture_path = os.path.join(os.getcwd(), "textures")
     images_path = os.path.join(os.getcwd(), "images")
     mesh_path = os.path.join(os.getcwd(), "meshes")
+    script_path = os.path.join(os.getcwd(), "scripts")
 
     aspect_ratios = settings[settings.sk_aspect_ratios].split(",")
     messages = settings[settings.sk_messages]
     plugin_name = settings[settings.sk_plugin_name]
-    frequencies = settings[settings.sk_frequency_list].split(",")
-    default_frequency = int(settings[settings.sk_default_frequency])
+    frequency = settings[settings.sk_frequency]
+    # frequencies = settings[settings.sk_frequency_list].split(",")
+    # default_frequency = int(settings[settings.sk_default_frequency])
+    condition = settings[settings.sk_condition]
+    condition_list = settings[settings.sk_condition_list].split(",")
+    condition_desc = {
+        "standalone": "Both vanilla and custom loading screens will appear.",
+        "replacer": "Custom loading screens have higher priorities, so vanilla loading screens will no longer appear.",
+        "mcm": "Adds a Mod Configuration Menu that allows you to select the frequency at which custom loading screens will appear. Requires SKSE and SkyUI.",
+        "fixed": "Custom loading screens will appear with a fixed frequency of " + str(frequency) + "%.",
+        "test": "The loading screen that will appear depends on a global variable. Set the global variable to a specific value to force a specific loading screen.",
+        "deprecated": "Implements the frequency using independent small probabilities. Unreliable, especially when a lot of custom loading screens exist.",
+    }
+    condition_scripts = ["mcm", "fixed"]
+    add_scripts_to_fomod = False
+    for cond in condition_list:
+        if cond in condition_scripts:
+            add_scripts_to_fomod = True
     default_border_option = settings[settings.sk_border_options]
     border_options = ['black', 'crop', 'stretch', 'fullheight', 'fullwidth']
     border_option_names = ['Black', 'Crop', 'Stretch', 'Full Height', 'Full Width']
@@ -268,13 +290,17 @@ def main():
     for aspect_ratio in aspect_ratios:
         safe_make_directory(os.path.join(fomod_folder, aspect_ratio))
 
+    if add_scripts_to_fomod:
+        script_folder = os.path.join(fomod_folder, "scripts")
+        shutil.copytree(script_path, script_folder)
+
     safe_make_directory(os.path.join(fomod_folder, "messages"))
     safe_make_directory(os.path.join(fomod_folder, "no_messages"))
     safe_make_directory(os.path.join(fomod_folder, "fomod"))
 
-    for freq in frequencies:
-        safe_make_directory(os.path.join(fomod_folder, "messages", "p" + str(freq)))
-        safe_make_directory(os.path.join(fomod_folder, "no_messages", "p" + str(freq)))
+    for cond in condition_list:
+        safe_make_directory(os.path.join(fomod_folder, "messages", cond))
+        safe_make_directory(os.path.join(fomod_folder, "no_messages", cond))
 
     # Move files
     shutil.copytree(texture_path, os.path.join(main_folder, "textures"))
@@ -290,18 +316,18 @@ def main():
             shutil.copytree(os.path.join(mesh_path, aspect_ratio, default_border_option), fomod_mesh_path)
             safe_make_directory(os.path.join(fomod_mesh_path, "_mesh_option_" + str(aspect_ratio) + "_" + str(default_border_option)))
 
-    for p in frequencies:
-        plugin = "FOMOD_M0" + "_P" + str(p) + "_FOMODEND_" + plugin_name
+    for cond in condition_list:
+        plugin = "../FOMOD_M0" + "_P_" + cond + "_" + str(frequency) + "_FOMODEND_" + plugin_name
         if os.path.exists(plugin):
-            fomod_plugin_path = os.path.join(fomod_folder, "no_messages", "p" + str(p))
+            fomod_plugin_path = os.path.join(fomod_folder, "no_messages", cond)
             shutil.copy(plugin, os.path.join(fomod_plugin_path, plugin_name))
-            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_no_messages_" + str(p)))
+            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_no_messages_" + cond))
 
-        plugin = "FOMOD_M1" + "_P" + str(p) + "_FOMODEND_" + plugin_name
+        plugin = "../FOMOD_M1" + "_P_" + cond + "_" + str(frequency) + "_FOMODEND_" + plugin_name
         if os.path.exists(plugin):
-            fomod_plugin_path = os.path.join(fomod_folder, "messages", "p" + str(p))
+            fomod_plugin_path = os.path.join(fomod_folder, "messages", cond)
             shutil.copy(plugin, os.path.join(fomod_plugin_path, plugin_name))
-            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_messages_" + str(p)))
+            safe_make_directory(os.path.join(fomod_plugin_path, "_plugin_option_messages_" + cond))
 
     info_xml = open(os.path.join(fomod_folder, "fomod", "info.xml"), "w")
     info_xml.writelines([
@@ -377,34 +403,43 @@ def main():
         choose_messages.add_option(no)
         fomod.add_install_step(choose_messages)
 
-        if len(frequencies) == 1:
-            yes.add_folder(os.path.join('messages', 'p' + str(frequencies[0])), '')
-            no.add_folder(os.path.join('no_messages', 'p' + str(frequencies[0])), '')
+        if len(condition_list) == 1:
+            yes.add_folder(os.path.join('messages', condition_list[0]), '')
+            no.add_folder(os.path.join('no_messages', condition_list[0]), '')
+            if condition_list[0] in condition_scripts:
+                yes.add_folder('scripts', 'scripts')
+                no.add_folder('scripts', 'scripts')
 
-    if messages == 'always' and len(frequencies) == 1:
-        fomod.add_required_folder(os.path.join('messages', 'p' + str(frequencies[0])), '')
+    if messages == 'always' and len(condition_list) == 1:
+        fomod.add_required_folder(os.path.join('messages', condition_list[0]), '')
+        if condition_list[0] in condition_scripts:
+            fomod.add_required_folder('scripts', 'scripts')
 
-    if messages == 'never' and len(frequencies) == 1:
-        fomod.add_required_folder(os.path.join('no_messages', 'p' + str(frequencies[0])), '')
+    if messages == 'never' and len(condition_list) == 1:
+        fomod.add_required_folder(os.path.join('no_messages', condition_list[0]), '')
+        if condition_list[0] in condition_scripts:
+            fomod.add_required_folder('scripts', 'scripts')
 
-    if len(frequencies) > 1:
+    if len(condition_list) > 1:
         choose_frequency_yes = InstallStep('Loading Screen Frequency')
         choose_frequency_no = InstallStep('Loading Screen Frequency')
 
-        for freq in frequencies:
-            desc = 'Controls how often the loading screens appear. With a frequency of 100%, ' \
-                   'loading screens from vanilla and vanilla compatible loading screen mods will no longer be used.'
+        for cond in condition_list:
+            desc = condition_desc[cond]
 
-            freq_option_yes = InstallOption(str(freq) + '%', desc)
-
-            freq_option_yes.add_folder(os.path.join('messages', 'p' + str(freq)), '')
+            freq_option_yes = InstallOption(cond, desc)
+            freq_option_yes.add_folder(os.path.join('messages', cond), '')
             choose_frequency_yes.add_option(freq_option_yes)
 
-            freq_option_no = InstallOption(str(freq) + '%', desc)
-            freq_option_no.add_folder(os.path.join('no_messages', 'p' + str(freq)), '')
+            freq_option_no = InstallOption(cond, desc)
+            freq_option_no.add_folder(os.path.join('no_messages', cond), '')
             choose_frequency_no.add_option(freq_option_no)
 
-            if int(freq) == default_frequency:
+            if cond in condition_scripts:
+                freq_option_yes.add_folder('scripts', 'scripts')
+                freq_option_no.add_folder('scripts', 'scripts')
+
+            if cond == condition:
                 freq_option_yes.set_default()
                 freq_option_no.set_default()
 

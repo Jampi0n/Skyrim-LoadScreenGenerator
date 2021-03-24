@@ -29,6 +29,8 @@ const string defaultPluginName = "JLoadScreens.esp";
 const string scriptName = "JLoadScreens";
 const string settingsName = "Settings.txt";
 
+const string advancedOutputFolder = "JLoadScreensAdvanced";
+
 string editScriptsSubFolder;
 
 int totalLoadScreens;
@@ -38,6 +40,14 @@ TStringList imagePathArray, imageWidthArray, imageHeightArray, imageTextArray;
 
 bool error = false;
 TForm mainForm;
+
+void CopyFromCustom (string path, bool advanced) {
+    if (advanced) {
+        CopyFile (editScriptsSubFolder + "\\Custom\\" + path, DataPath + "\\" + advancedOutputFolder + "\\" + path, false);
+    } else {
+        CopyFile (editScriptsSubFolder + "\\Custom\\" + path, DataPath + "\\" + path, false);
+    }
+}
 
 void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced) {
     if (advanced) {
@@ -51,9 +61,9 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
     string pluginName = ReadSetting (skPluginName);
     string texturePathShort;
     if (advanced) {
-        texturePathShort = "textures\\" + ReadSetting (skModFolder);
+        texturePathShort = advancedOutputFolder + "\\textures\\" + ReadSetting (skModFolder);
     } else {
-        texturePathShort = "textures\\JLoadScreens";
+        texturePathShort = "textures\\" + defaultModFolder;
     }
     string texturePath = DataPath + texturePathShort;
     // MO2 automatically creates folders
@@ -61,12 +71,12 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
     forcedirectories (texturePath);
 
     // Create .dds files in texture path
-    ProcessTextures (sourcePath, texturePath, recursive);
+    ProcessTextures (sourcePath, texturePath, recursive, advanced);
     Log ("  Using " + inttostr (totalLoadScreens) + " images for loading screen generation.");
     Log ("	");
 
     // Create .nif files in mesh path
-    if (ReadSettingBool (skGenerateMeshes)) {
+    if (ReadSettingBool (skGenerateMeshes) || !advanced) {
         MeshGen (advanced, texturePathShort, templatePath);
     }
 
@@ -75,15 +85,35 @@ void Main (string sourcePath, bool disableOthers, bool recursive, bool advanced)
 
     if (advanced) {
         Log ("	Copying build files...");
-        CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.cmd", DataPath + "create_fomod.cmd", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\create_fomod.py", DataPath + "create_fomod.py", false);
-        CopyFile (editScriptsSubFolder + "\\settings.txt", DataPath + "settings.txt", false);
-        forcedirectories (DataPath + "\\images");
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\black.png", DataPath + "images\\black.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\crop.png", DataPath + "images\\crop.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\stretch.png", DataPath + "images\\stretch.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullwidth.png", DataPath + "images\\fullwidth.png", false);
-        CopyFile (editScriptsSubFolder + "\\Custom\\images\\fullheight.png", DataPath + "images\\fullheight.png", false);
+        CopyFromCustom ("create_fomod.cmd", advanced);
+        CopyFromCustom ("create_fomod.py", advanced);
+        // settings.txt is not located in /custom/
+        CopyFile (editScriptsSubFolder + "\\settings.txt", DataPath + "\\" + advancedOutputFolder + "\\settings.txt", false);
+        forcedirectories (DataPath + "\\" + advancedOutputFolder + "\\images");
+        CopyFromCustom ("images\\black.png", advanced);
+        CopyFromCustom ("images\\crop.png", advanced);
+        CopyFromCustom ("images\\stretch.png", advanced);
+        CopyFromCustom ("images\\fullwidth.png", advanced);
+        CopyFromCustom ("images\\fullheight.png", advanced);
+        // copy scripts regardless of options
+        forcedirectories (DataPath + "\\" + advancedOutputFolder + "\\scripts\\source");
+        CopyFromCustom ("scripts\\JLS_MCM_Quest_Script.pex", advanced);
+        CopyFromCustom ("scripts\\JLS_TrackInSameCell.pex", advanced);
+        CopyFromCustom ("scripts\\JLS_XMarkerReferenceScript.pex", advanced);
+        CopyFromCustom ("scripts\\source\\JLS_MCM_Quest_Script.psc", advanced);
+        CopyFromCustom ("scripts\\source\\JLS_TrackInSameCell.psc", advanced);
+        CopyFromCustom ("scripts\\source\\JLS_XMarkerReferenceScript.psc", advanced);
+    } else {
+        if ((ReadSetting (skCondition) == "mcm") || (ReadSetting (skCondition) == "fixed")) {
+            // copy scripts
+            forcedirectories (DataPath + "\\scripts\\source");
+            CopyFromCustom ("scripts\\JLS_MCM_Quest_Script.pex", advanced);
+            CopyFromCustom ("scripts\\JLS_TrackInSameCell.pex", advanced);
+            CopyFromCustom ("scripts\\JLS_XMarkerReferenceScript.pex", advanced);
+            CopyFromCustom ("scripts\\source\\JLS_MCM_Quest_Script.psc", advanced);
+            CopyFromCustom ("scripts\\source\\JLS_TrackInSameCell.psc", advanced);
+            CopyFromCustom ("scripts\\source\\JLS_XMarkerReferenceScript.psc", advanced);
+        }
     }
     Log ("	Done");
 }
@@ -156,13 +186,13 @@ int Advanced () {
         TLabel messagesLabel = AddLabel (optionsBox, 16, 24, 160, 24, "Messages");
         TEdit messagesLine = AddLine (messagesLabel, 80, -4, mainForm.Width - 128, ReadSetting (skMessages), "always/never/optional");
 
-        TLabel frequencyListLabel = AddLabel (messagesLabel, 0, 24, 160, 24, "Freq. List");
-        TEdit frequencyListLine = AddLine (frequencyListLabel, 80, -4, mainForm.Width - 128, ReadSetting (skFrequencyList), "Comma separated list of frequencies, e.g. \"5, 15, 50, 100\"");
+        TLabel conditionsListLabel = AddLabel (messagesLabel, 0, 24, 160, 24, "Cond. List");
+        TEdit conditionsListLine = AddLine (conditionsListLabel, 80, -4, mainForm.Width - 128, ReadSetting (skConditionList), "Comma separated list of condition options, e.g. \"standalone,replacer,mcm\"");
 
-        TLabel frequencyDefaultLabel = AddLabel (frequencyListLabel, 0, 24, 160, 24, "Def. Freq.");
-        TEdit frequencyDefaultLine = AddLine (frequencyDefaultLabel, 80, -4, mainForm.Width - 128, ReadSetting (skDefaultFrequency), "Default frequency.");
+        //TLabel frequencyDefaultLabel = AddLabel (frequencyListLabel, 0, 24, 160, 24, "Def. Freq.");
+        //TEdit frequencyDefaultLine = AddLine (frequencyDefaultLabel, 80, -4, mainForm.Width - 128, ReadSetting (skDefaultFrequency), "Default frequency.");
 
-        TCheckBox chooseBorderOptionsCheckBox = AddCheckBox (frequencyDefaultLabel, 0, 24, ReadSettingBool (skChooseBorderOption), "Choose Border", "Adds border options to the FOMOD installer.");
+        TCheckBox chooseBorderOptionsCheckBox = AddCheckBox (conditionsListLabel, 0, 24, ReadSettingBool (skChooseBorderOption), "Choose Border", "Adds border options to the FOMOD installer.");
 
         TCheckBox generateTexturesCheckBox = AddCheckBox (chooseBorderOptionsCheckBox, 0, 24, ReadSettingBool (skGenerateTextures), "Generate Textures", "This step takes long and can be disabled, if the textures were generated previously. Make sure only valid images are in the directory, as image processing/validation may be skipped.");
 
@@ -182,15 +212,14 @@ int Advanced () {
             WriteSetting (skPrefix, modPrefixLine.Text);
             WriteSetting (skModLink, modLinkLine.Text);
             WriteSetting (skMessages, messagesLine.Text);
-            WriteSetting (skFrequencyList, frequencyListLine.Text);
-            WriteSetting (skDefaultFrequency, frequencyDefaultLine.Text);
+            WriteSetting (skConditionList, conditionsListLine.Text);
+            //WriteSetting (skDefaultFrequency, frequencyDefaultLine.Text);
             WriteSetting (skChooseBorderOption, chooseBorderOptionsCheckBox.Checked);
             WriteSetting (skGenerateTextures, generateTexturesCheckBox.Checked);
             WriteSetting (skGenerateMeshes, generateMeshesCheckBox.Checked);
 
             SaveSettings ();
             if (!error) {
-
                 Main (ReadSetting (skSourcePath), ReadSettingBool (skDisableOtherLoadScreens), ReadSettingBool (skRecursive), true);
             } else {
                 Log ("	");
@@ -233,10 +262,14 @@ int UI () {
 
         TCheckBox checkBoxDisableOthers = AddCheckBox (optionsBox, 8, 16, ReadSettingBool (skDisableOtherLoadScreens), "Disable other Loading Screens", "Prevents other loading screens (other mods and vanilla) from showing.");
         TCheckBox checkBoxSubDirs = AddCheckBox (checkBoxDisableOthers, 0, 16, ReadSettingBool (skRecursive), "Include subdirectories", "Includes subdirectories of the source directory, when searching for images.");
-        TCheckBox checkBoxTestMode = AddCheckBox (checkBoxSubDirs, 0, 16, ReadSettingBool (skTestMode), "Test Mode", "Adds a global variable, which can be used to force specific loading screens.");
-        TLabel frequencyLabel = AddLabel (checkBoxTestMode, 0, 24, 64, 24, "Frequency:");
-        TEdit frequencyLine = AddLine (frequencyLabel, 60, -4, 40, ReadSetting (skFrequency), "Loading screen frequency: 0 - 100");
-        TLabel borderLabel = AddLabel (frequencyLabel, 0, 24, 64, 24, "Border Options:");
+        //TCheckBox checkBoxTestMode = AddCheckBox (checkBoxSubDirs, 0, 16, ReadSettingBool (skTestMode), "Test Mode", "Adds a global variable, which can be used to force specific loading screens.");
+        TLabel frequencyLabel = AddLabel (checkBoxSubDirs, 0, 24, 64, 24, "Frequency:");
+        TEdit frequencyLine = AddLine (frequencyLabel, 60, -4, 40, ReadSetting (skFrequency), "Loading screen frequency: 0 - 100. Only used together with \"mcm\" or \"fixed\" condition options.");
+
+        TLabel conditionLabel = AddLabel (frequencyLabel, 0, 24, 64, 24, "Cond. Options:");
+        TEdit conditionLine = AddLine (conditionLabel, 80, -4, 96, ReadSetting (skCondition), "standalone,replacer,mcm,fixed");
+
+        TLabel borderLabel = AddLabel (conditionLabel, 0, 24, 64, 24, "Border Options:");
         TEdit borderLine = AddLine (borderLabel, 80, -4, 96, ReadSetting (skBorderOptions), "black,crop,stretch,fullheight,fullwidth");
 
         TLabel resolutionLabel = AddLabel (optionsBox, 224, 18, 64, 24, "Texture Resolution:");
@@ -303,13 +336,19 @@ int UI () {
 
             string tmpStr = borderLine.Text;
             if ((tmpStr == "black") || (tmpStr == "crop") || (tmpStr == "fullheight") || (tmpStr == "fullwidth") || (tmpStr == "stretch")) {
-
                 WriteSetting (skBorderOptions, tmpStr);
             } else {
                 ErrorMsg ("Border option <" + tmpStr + "> is unknown.");
             }
 
-            WriteSetting (skTestMode, checkBoxTestMode.Checked);
+            string tmpStr = conditionLine.Text;
+            if ((tmpStr == "standalone") || (tmpStr == "replacer") || (tmpStr == "mcm") || (tmpStr == "fixed") || (tmpStr == "test") || (tmpStr == "deprecated")) {
+                WriteSetting (skCondition, tmpStr);
+            } else {
+                ErrorMsg ("Condition option <" + tmpStr + "> is unknown.");
+            }
+
+            //WriteSetting (skTestMode, checkBoxTestMode.Checked);
 
             tmpInt = strtoint (frequencyLine.Text);
             if ((tmpInt >= 0) && (tmpInt <= 100)) { WriteSetting (skFrequency, tmpInt); } else { ErrorMsg ("Frequency must be between 0 and +100."); }

@@ -150,14 +150,14 @@ void MeshGen (bool advanced, string texturePathShort, string templatePath) {
 
         for (int i = 0; i < aspectRatioList.Count (); i += 1) {
             for (int j = 0; j < borderOptionList.Count (); j += 1) {
-                string meshPath = DataPath + "meshes\\" + aspectRatioList[i] + "\\" + borderOptionList[j] + "\\" + ReadSetting (skModFolder);
+                string meshPath = DataPath + advancedOutputFolder + "\\meshes\\" + aspectRatioList[i] + "\\" + borderOptionList[j] + "\\" + ReadSetting (skModFolder);
                 Log ("	Creating loading screen meshes for aspect ratio: " + aspectRatioList[i]);
                 forcedirectories (meshPath);
                 CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", strtofloat (widthList[i]) / strtofloat (heightList[i]), borderOptionList[j]);
             }
         }
     } else {
-        string meshPath = DataPath + "meshes\\JLoadScreens";
+        string meshPath = DataPath + "meshes\\" + defaultModFolder;
         forcedirectories (meshPath);
         CreateMeshes (meshPath, texturePathShort, templateNif, wbAppName == "SSE", ReadSettingInt (skDisplayWidth) / ReadSettingInt (skDisplayHeight), ReadSetting (skBorderOptions));
     }

@@ -4,7 +4,8 @@ int settingKey;
 int skSourcePath, skDisableOtherLoadScreens, skDisplayWidth, skDisplayHeight, skStretch, skRecursive, skFullHeight,
 skFrequency, skGamma, skContrast, skBrightness, skSaturation, skBorderOptions, skResolution, skModName, skModVersion,
 skModFolder, skPluginName, skModAuthor, skPrefix, skModLink, skTestMode, skAspectRatios, skTextureResolutions,
-skMessages, skFrequencyList, skDefaultFrequency, skChooseBorderOption, skGenerateTextures, skGenerateMeshes;
+skMessages, skFrequencyList, skDefaultFrequency, skChooseBorderOption, skGenerateTextures, skGenerateMeshes,
+skCondition, skConditionList;
 
 int GetSettingKey (string def) {
     if (settings.Count () <= settingKey) {
@@ -93,5 +94,8 @@ void InitSettingKeys () {
 
     skGenerateTextures = GetSettingKey ("True");
     skGenerateMeshes = GetSettingKey ("True");
+
+    skCondition = GetSettingKey ("standalone");
+    skConditionList = GetSettingKey ("replacer,standalone,mcm");
 
 }

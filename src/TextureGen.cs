@@ -15,7 +15,7 @@ string ParseTexDiagOutput (string output) {
     Result = Copy (output, 17, length (output));
 }
 
-void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
+void ProcessTextures (string sourcePath, string targetPath, bool recursive, bool advanced) {
     int tmp;
     string cmd;
     TStringList sourcePathList = TStringList.Create ();
@@ -54,7 +54,7 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
 
             texturePathList.Add (s);
 
-            if (ReadSettingBool (skGenerateTextures)) {
+            if (ReadSettingBool (skGenerateTextures) || !advanced) {
                 bool srgb = false;
                 string srgbCmd = "";
 
@@ -121,7 +121,7 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive) {
                 }
             }
 
-            if (ReadSettingBool (skGenerateMeshes)) {
+            if (ReadSettingBool (skGenerateMeshes) || !advanced) {
                 try {
                     // Execute %subfolder%\texdiag.exe
                     // Output is saved to %subfolder%\texdiag.txt
