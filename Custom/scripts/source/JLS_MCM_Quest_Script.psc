@@ -5,6 +5,7 @@ GlobalVariable Property FrequencyProperty Auto
 int frequencySlider
 
 Event OnPageReset(string aPage)
+	SetCursorFillMode(TOP_TO_BOTTOM)
 	AddHeaderOption("Loading Screen Frequency")
 	frequencySlider = AddSliderOption("Frequency", FrequencyProperty.GetValue() as int, "{0}%")
 EndEvent

@@ -6,7 +6,6 @@ GlobalVariable Property RandomVar Auto
 ObjectReference Property MarkerRef Auto
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
-	Debug.notification("player changed cells")
 	Utility.Wait(0.1) ; Required.
 	MarkerRef.MoveTo(PlayerRef)
 	RandomVar.SetValue(Utility.RandomFloat(0.0, 100.0))
