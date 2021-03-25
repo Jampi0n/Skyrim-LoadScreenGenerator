@@ -161,6 +161,7 @@ void ProcessTextures (string sourcePath, string targetPath, bool recursive, bool
                 }
             } else {
                 imagePathArray.Add (s);
+                string textFile = ChangeFileExt (sourcePathList[i], ".txt");
                 if (FileExists (textFile)) {
                     readTextFile = TStringList.Create ();
                     readTextFile.LoadFromFile (textFile);
