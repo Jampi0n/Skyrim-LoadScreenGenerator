@@ -302,7 +302,8 @@ int UI () {
 
         TButton btnOk = AddButton (nil, 8, mainForm.Height - 64, "OK", 1);
         TButton btnCancel = AddButton (btnOk, btnOk.Width + 16, 0, "Cancel", -1);
-        TButton btnAdvanced = AddButton (nil, mainForm.Width - 96, mainForm.Height - 64, "Advanced", 2);
+        TButton btnAdvanced = AddButton (nil, mainForm.Width - 112, mainForm.Height - 64, "FOMOD Creator", 2);
+        btnAdvanced.width = 96;
 
         int modalResult = mainForm.ShowModal;
         if ((modalResult == 1) || (modalResult == 2)) {
