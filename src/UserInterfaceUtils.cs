@@ -72,3 +72,36 @@ TCheckBox AddCheckBox (TForm relativeTo, float offsetX, float offsetY, bool valu
     checkBox.ShowHint = (hint != "");
     Result = checkBox;
 }
+
+TComboBox AddComboBox (TForm relativeTo, float offsetX, float offsetY, float width, string current, string options, string hint) {
+    TComboBox comboBox = TComboBox.Create (mainForm);
+    comboBox.Parent = mainForm;
+    comboBox.Left = GetRelativeX (relativeTo, offsetX);
+    comboBox.Top = GetRelativeY (relativeTo, offsetY);
+    comboBox.Width = width;
+    comboBox.Hint = hint;
+    comboBox.ShowHint = (hint != "");
+    comboBox.Style = csDropDownList;
+
+    TStringList optionList = TStringList.Create ();
+    optionList.Delimiter = ",";
+    optionList.StrictDelimiter = True;
+    optionList.DelimitedText = options;
+
+    string allOptions = "";
+    int currentIndex = 0;
+    for (int i = 0; i < optionList.Count (); i += 1) {
+        if (SameText (optionList[i], current)) {
+            currentIndex = i;
+        }
+        allOptions += optionList[i];
+        if (i < optionList.Count () - 1) {
+            allOptions += "\n";
+        }
+    }
+
+    comboBox.Items.Text = allOptions;
+    comboBox.ItemIndex = currentIndex;
+
+    Result = comboBox;
+}

@@ -267,13 +267,13 @@ int UI () {
         TEdit frequencyLine = AddLine (frequencyLabel, 60, -4, 40, ReadSetting (skFrequency), "Loading screen frequency: 0 - 100. Only used together with \"mcm\" or \"fixed\" condition options.");
 
         TLabel conditionLabel = AddLabel (frequencyLabel, 0, 24, 64, 24, "Cond. Options:");
-        TEdit conditionLine = AddLine (conditionLabel, 80, -4, 96, ReadSetting (skCondition), "standalone,replacer,mcm,fixed");
+        TComboBox conditionBox = AddComboBox (conditionLabel, 80, -4, 96, ReadSetting (skCondition), "standalone,replacer,mcm,fixed", "Under which conditions the loading screens are shown.");
 
         TLabel borderLabel = AddLabel (conditionLabel, 0, 24, 64, 24, "Border Options:");
-        TEdit borderLine = AddLine (borderLabel, 80, -4, 96, ReadSetting (skBorderOptions), "black,crop,stretch,fullheight,fullwidth");
+        TComboBox borderBox = AddComboBox (borderLabel, 80, -4, 96, ReadSetting (skBorderOptions), "black,crop,stretch,fullheight,fullwidth", "How images with different aspect ratios are displayed.");
 
         TLabel resolutionLabel = AddLabel (optionsBox, 224, 18, 64, 24, "Texture Resolution:");
-        TEdit resolutionLine = AddLine (resolutionLabel, 96, -4, 48, ReadSetting (skResolution), "Texture Resolution: e.g 1024, 2048, 4096");
+        TComboBox resolutionBox = AddComboBox (resolutionLabel, 96, -4, 64, ReadSetting (skResolution), "1024,2048,4096,8192", "Resolution of the generated textures.");
 
         TGroupBox imageAdjustmentBox = TGroupBox.Create (mainForm);
         imageAdjustmentBox.Parent = mainForm;
@@ -324,7 +324,7 @@ int UI () {
                 ErrorMsg ("Height must be positive number.");
             }
 
-            tmpInt = strtoint (resolutionLine.Text);
+            tmpInt = strtoint (resolutionBox.Text);
             if (tmpInt > 0) {
                 WriteSetting (skResolution, tmpInt);
             } else {
@@ -334,14 +334,14 @@ int UI () {
             WriteSetting (skDisableOtherLoadScreens, checkBoxDisableOthers.Checked);
             WriteSetting (skRecursive, checkBoxSubDirs.Checked);
 
-            string tmpStr = borderLine.Text;
+            string tmpStr = borderBox.Text;
             if ((tmpStr == "black") || (tmpStr == "crop") || (tmpStr == "fullheight") || (tmpStr == "fullwidth") || (tmpStr == "stretch")) {
                 WriteSetting (skBorderOptions, tmpStr);
             } else {
                 ErrorMsg ("Border option <" + tmpStr + "> is unknown.");
             }
 
-            string tmpStr = conditionLine.Text;
+            string tmpStr = conditionBox.Text;
             if ((tmpStr == "standalone") || (tmpStr == "replacer") || (tmpStr == "mcm") || (tmpStr == "fixed") || (tmpStr == "test") || (tmpStr == "deprecated")) {
                 WriteSetting (skCondition, tmpStr);
             } else {
